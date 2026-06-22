@@ -1,0 +1,73 @@
+<%- include('header', { title: 'Logging', active: 'logging' }) %>
+  <div class="page-header">
+    <h1>Logging Configuration</h1>
+  </div>
+
+  <div class="section">
+    <h2>Guild-Wide Logging</h2>
+    <% var guildIds = Object.keys(logCfg); %>
+    <% if (guildIds.length === 0) { %>
+      <div class="empty"><p>No guilds have logging configured yet.</p></div>
+    <% } %>
+    <div class="log-grid">
+      <% for (const guildId of guildIds) { %>
+        <% var cfg = logCfg[guildId]; %>
+        <div class="log-card">
+          <h3>Guild: <code><%= guildId %></code></h3>
+          <div class="toggle-group">
+            <form method="POST" action="/logging" class="inline-form">
+              <input type="hidden" name="guildId" value="<%= guildId %>">
+              <input type="hidden" name="type" value="messages">
+              <input type="hidden" name="enabled" value="<%= !cfg.messages %>">
+              <button class="btn btn-sm <%= cfg.messages ? 'btn-success' : 'btn-primary' %>">
+                Messages: <%= cfg.messages ? 'ON' : 'OFF' %>
+              </button>
+            </form>
+            <form method="POST" action="/logging" class="inline-form">
+              <input type="hidden" name="guildId" value="<%= guildId %>">
+              <input type="hidden" name="type" value="reactions">
+              <input type="hidden" name="enabled" value="<%= !cfg.reactions %>">
+              <button class="btn btn-sm <%= cfg.reactions ? 'btn-success' : 'btn-primary' %>">
+                Reactions: <%= cfg.reactions ? 'ON' : 'OFF' %>
+              </button>
+            </form>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Per-Channel Logging</h2>
+    <% var channelIds = Object.keys(channelLogCfg); %>
+    <% if (channelIds.length === 0) { %>
+      <div class="empty"><p>No per-channel logging configured.</p></div>
+    <% } %>
+    <div class="log-grid">
+      <% for (const chId of channelIds) { %>
+        <% var cfg = channelLogCfg[chId]; %>
+        <div class="log-card">
+          <h3>Channel: <code><%= chId %></code></h3>
+          <div class="toggle-group">
+            <form method="POST" action="/logging" class="inline-form">
+              <input type="hidden" name="channelId" value="<%= chId %>">
+              <input type="hidden" name="type" value="messages">
+              <input type="hidden" name="enabled" value="<%= !cfg.messages %>">
+              <button class="btn btn-sm <%= cfg.messages ? 'btn-success' : 'btn-primary' %>">
+                Messages: <%= cfg.messages ? 'ON' : 'OFF' %>
+              </button>
+            </form>
+            <form method="POST" action="/logging" class="inline-form">
+              <input type="hidden" name="channelId" value="<%= chId %>">
+              <input type="hidden" name="type" value="reactions">
+              <input type="hidden" name="enabled" value="<%= !cfg.reactions %>">
+              <button class="btn btn-sm <%= cfg.reactions ? 'btn-success' : 'btn-primary' %>">
+                Reactions: <%= cfg.reactions ? 'ON' : 'OFF' %>
+              </button>
+            </form>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+<%- include('footer') %>

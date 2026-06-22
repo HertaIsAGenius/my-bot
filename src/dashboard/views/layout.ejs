@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title || 'Dashboard' %> — Mod Bot</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/" class="brand">Mod Bot</a>
+    <a href="/infractions" class="<%= active === 'infractions' ? 'active' : '' %>">Infractions</a>
+    <a href="/tickets" class="<%= active === 'tickets' ? 'active' : '' %>">Tickets</a>
+    <a href="/todos" class="<%= active === 'todos' ? 'active' : '' %>">Todo List</a>
+    <a href="/logging" class="<%= active === 'logging' ? 'active' : '' %>">Logging</a>
+    <a href="/slowmode" class="<%= active === 'slowmode' ? 'active' : '' %>">Slowmode</a>
+    <a href="/modchannel" class="<%= active === 'modchannel' ? 'active' : '' %>">Mod Channel</a>
+  </nav>
+  <div class="container">
+    <%- body %>
+  </div>
+</body>
+</html>

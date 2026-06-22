@@ -1,0 +1,32 @@
+{
+  "name": "probebot",
+  "version": "1.0.0",
+  "description": "Discord moderation bot with ticketing, XP, tags, and dashboard.",
+  "main": "dist/start.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/start.ts",
+    "dashboard": "ts-node src/dashboard/server.ts",
+    "start": "node start.js",
+    "start:bot": "ts-node src/index.ts",
+    "start:dashboard": "ts-node src/dashboard/server.ts",
+    "postinstall": "npx tsc"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^1.0.0",
+    "discord.js": "^14.18.0",
+    "dotenv": "^16.3.1",
+    "ejs": "^6.0.1",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/ejs": "^3.1.5",
+    "@types/express": "^5.0.6",
+    "@types/node": "^20.14.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.5.4"
+  }
+}

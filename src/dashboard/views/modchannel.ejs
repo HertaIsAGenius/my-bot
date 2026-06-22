@@ -1,0 +1,56 @@
+<%- include('header', { title: 'Mod Channel', active: 'modchannel' }) %>
+  <div class="page-header">
+    <h1>Moderator Channel Configuration</h1>
+  </div>
+
+  <div class="section">
+    <h2>Configured Guilds</h2>
+    <% var guildIds = Object.keys(meta); %>
+    <% var configured = guildIds.filter(g => meta[g]?.moderatorChannel); %>
+    <% if (configured.length === 0) { %>
+      <div class="empty"><p>No moderator channels configured. Use <code>/modchannel</code> or <code>!modchannel #channel</code> in Discord, or add one below.</p></div>
+    <% } else { %>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Guild ID</th>
+              <th>Channel ID</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% for (const guildId of configured) { %>
+              <tr>
+                <td><code><%= guildId %></code></td>
+                <td><code><%= meta[guildId].moderatorChannel %></code></td>
+                <td>
+                  <form method="POST" action="/modchannel" class="inline-form" onsubmit="return confirm('Remove this configuration?')">
+                    <input type="hidden" name="guildId" value="<%= guildId %>">
+                    <input type="hidden" name="channelId" value="">
+                    <button class="btn btn-danger btn-sm">Remove</button>
+                  </form>
+                </td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="section">
+    <h2>Add or Update</h2>
+    <form method="POST" action="/modchannel" style="display: flex; gap: 8px; align-items: flex-end;">
+      <div class="form-group" style="flex: 1;">
+        <label>Guild ID</label>
+        <input name="guildId" placeholder="e.g. 123456789012345678" required>
+      </div>
+      <div class="form-group" style="flex: 1;">
+        <label>Channel ID</label>
+        <input name="channelId" placeholder="e.g. 123456789012345678" required>
+      </div>
+      <button class="btn btn-primary">Save</button>
+    </form>
+  </div>
+<%- include('footer') %>

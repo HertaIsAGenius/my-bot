@@ -1,0 +1,46 @@
+<%- include('header', { title: 'Dashboard', active: 'dashboard' }) %>
+  <div class="page-header">
+    <h1>Dashboard</h1>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="value blue"><%= guildCount %></div>
+      <div class="label">Guilds Tracked</div>
+    </div>
+    <div class="card">
+      <div class="value red"><%= totalInfractions %></div>
+      <div class="label">Total Infractions</div>
+    </div>
+    <div class="card">
+      <div class="value purple"><%= totalUsers %></div>
+      <div class="label">Users with Infractions</div>
+    </div>
+    <div class="card">
+      <div class="value cyan"><%= openTickets %></div>
+      <div class="label">Open Tickets</div>
+    </div>
+    <div class="card">
+      <div class="value green"><%= totalTodos %></div>
+      <div class="label">Todo Items</div>
+    </div>
+    <div class="card">
+      <div class="value orange"><%= guildsWithLogging %></div>
+      <div class="label">Guilds with Logging</div>
+    </div>
+    <div class="card">
+      <div class="value"><%= slowChannels %></div>
+      <div class="label">Slowmode Channels</div>
+    </div>
+    <div class="card">
+      <div class="value cyan"><%= modChannels %></div>
+      <div class="label">Mod Channels Set</div>
+    </div>
+    <div class="card">
+      <div class="value purple"><%= totalLogLines %></div>
+      <div class="label">Logged Events</div>
+    </div>
+  </div>
+
+  <p style="color: var(--text2); font-size: 14px;">This dashboard reads and writes the same data files the bot uses. Changes made here are reflected immediately.</p>
+<%- include('footer') %>

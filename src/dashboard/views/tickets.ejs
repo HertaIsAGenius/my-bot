@@ -1,0 +1,50 @@
+<%- include('header', { title: 'Tickets', active: 'tickets' }) %>
+  <div class="page-header">
+    <h1>Tickets</h1>
+  </div>
+
+  <% if (tickets.length === 0) { %>
+    <div class="empty"><p>No tickets found.</p></div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Guild</th>
+            <th>Reporter</th>
+            <th>Reported User</th>
+            <th>Reason</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% for (const t of tickets) { %>
+            <tr>
+              <td>#<%= t.id %></td>
+              <td><code><%= t.guildId %></code></td>
+              <td><code><%= t.reporterId %></code></td>
+              <td><%= t.reportedId ? '<code>' + t.reportedId + '</code>' : 'N/A' %></td>
+              <td><%= t.reason %></td>
+              <td><span class="badge <%= t.status %>"><%= t.status %></span></td>
+              <td><%= new Date(t.createdAt).toLocaleString() %></td>
+              <td>
+                <% if (t.status === 'open') { %>
+                  <form method="POST" action="/tickets/close" class="inline-form" onsubmit="return confirm('Close ticket #<%= t.id %>?')">
+                    <input type="hidden" name="guildId" value="<%= t.guildId %>">
+                    <input type="hidden" name="ticketId" value="<%= t.id %>">
+                    <button class="btn btn-success btn-sm">Close</button>
+                  </form>
+                <% } else { %>
+                  <span style="color: var(--text2); font-size: 12px;">Closed</span>
+                <% } %>
+              </td>
+            </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+<%- include('footer') %>
