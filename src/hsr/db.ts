@@ -1511,7 +1511,7 @@ export function getPlayerQuestEntries(userId: string, slot: number): any[] {
 export function ensureStarterQuest(userId: string, slot: number): void {
   const exists = db.prepare('SELECT 1 FROM hsr_player_quests WHERE user_id = ? AND slot_number = ? AND quest_id = ?').get(userId, slot, 'intro_01') as any;
   if (exists) return;
-  db.prepare('INSERT INTO hsr_player_quests (user_id, slot_number, quest_id, status) VALUES (?, ?, ?, "active")').run(userId, slot, 'intro_01');
+  db.prepare('INSERT INTO hsr_player_quests (user_id, slot_number, quest_id, status) VALUES (?, ?, ?, ?)').run(userId, slot, 'intro_01', 'active');
   db.prepare('UPDATE hsr_players SET current_quest_id = ? WHERE user_id = ? AND slot_number = ?').run('intro_01', userId, slot);
 }
 
