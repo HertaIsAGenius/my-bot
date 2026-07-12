@@ -129,7 +129,7 @@ app.get('/login', (req, res) => {
 });
 
 function getRedirectUri(req: express.Request): string {
-  const proto = req.headers['x-forwarded-proto'] as string || 'http';
+  const proto = req.headers['x-forwarded-proto'] as string || (DASHBOARD_URL.startsWith('https') ? 'https' : 'http');
   const host = req.headers['x-forwarded-host'] as string || req.headers.host || `localhost:${PORT}`;
   return `${proto}://${host}/auth/callback`;
 }
