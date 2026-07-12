@@ -1,0 +1,549 @@
+╔══════════════════════════════════════════════════════════════╗
+║                   PROBEBOT — FULL FEATURE LIST              ║
+╚══════════════════════════════════════════════════════════════╝
+
+A multi-purpose Discord bot built with discord.js v14, TypeScript,
+SQLite (better-sqlite3), and @napi-rs/canvas.
+
+───────────────────────────────────────────────────────────────
+TABLE OF CONTENTS
+───────────────────────────────────────────────────────────────
+1.  LEVELING & XP
+2.  RANK CARDS (Customisable)
+3.  ECONOMY
+4.  MODERATION
+5.  MOD DASHBOARD (Interactive Panel)
+6.  TICKET SYSTEM
+7.  TAGS (Canned Responses)
+8.  TO-DO LIST
+9.  WELCOME / GOODBYE
+10. AUTO-ROLE
+11. REACTION ROLES
+12. GIVEAWAYS
+13. SERVER STATS (Voice Channel Counters)
+14. JOIN-TO-CREATE (Temp Voice Channels)
+15. BIRTHDAYS
+16. LOGGING (Message & Reaction)
+17. AUTO SLOWMODE
+18. SLUMBER GUARD (Anti-Raid Slowmode)
+19. AUTO-MODERATION (Custom Rules)
+20. STICKER SENTINEL
+21. AI CHAT (LLM Integration)
+22. TRIAL APPLICATIONS (Custom Forms)
+23. VERIFICATION PANEL
+24. STYLED EMBEDS
+25. BOT PERMISSIONS (Role-based Command Control)
+26. COMMAND PERMISSIONS REFERENCE
+27. PREFIX (!) COMMANDS
+28. WEB DASHBOARD
+29. ENVIRONMENT VARIABLES
+
+
+═══════════════════════════════════════════════════════════════
+1. LEVELING & XP
+═══════════════════════════════════════════════════════════════
+
+Every message earns 15-25 XP (60-second cooldown).
+Level formula: level = floor((-50 + sqrt(2500 + 200 * XP)) / 100)
+
+Commands:
+  /rank [user]       — Show your (or another user's) rank card image
+  /leaderboard       — Top 10 users by all-time XP
+  /weekly            — Top 10 users by weekly XP
+  /top3              — Generate a leaderboard image of the top 3
+  /weeklyreset       — Reset all weekly XP counters (Manage Server)
+  /addxp <user> <n>  — Manually grant XP (Manage Server)
+  /xpclear           — Wipe all XP data for the guild (Manage Server)
+  /levelrole add|remove|list  — Auto-assign roles at specific levels
+  /levelupnotification channel [channel]  — Set a channel for level-up
+    announcements (leave blank to disable)
+
+Level-up auto-role: when a member reaches a level with a configured
+role reward, the bot assigns it automatically.
+
+═══════════════════════════════════════════════════════════════
+2. RANK CARDS (Customisable Per-User)
+═══════════════════════════════════════════════════════════════
+
+Each user can customise their own rank card appearance.
+Customisation is stored per-user per-guild in data/rankCards.json.
+
+Commands:
+  /rankcard view                            — See your current settings
+  /rankcard reset                           — Reset to defaults
+  /rankcard set background <hex>            — Background colour
+  /rankcard set accent <hex>                — Accent colour (rank text, bar fill)
+  /rankcard set bar <hex>                   — XP bar background colour
+  /rankcard set avatar <style>              — hexagon | circle | square
+  /rankcard set font <family>               — Font family name
+  /rankcard set bgimage <url|"none">        — Background image URL
+
+Canvas constants used: @napi-rs/canvas, 1080x360 px output.
+
+═══════════════════════════════════════════════════════════════
+3. ECONOMY
+═══════════════════════════════════════════════════════════════
+
+Per-guild economy with wallet & bank.
+
+Commands:
+  /balance [user]         — Check wallet + bank balance
+  /daily                  — Claim daily reward (once per 24h)
+  /work                   — Work for cash (cooldown)
+  /beg                    — Beg for coins (cooldown)
+  /gamble <amount>        — 50/50 gamble (subject to loss limits)
+  /pay <user> <amount>    — Transfer cash to another user
+  /rob <user>             — Attempt to rob (risky, cooldown)
+  /deposit <amount>       — Move cash to bank (safe)
+  /withdraw <amount>      — Move bank to wallet
+  /shop                   — Browse server shop
+  /buy <item_id>          — Purchase an item
+  /inventory [user]       — View items owned
+  /ecoleaderboard         — Richest users leaderboard
+  /shopadmin add|remove   — Manage shop items (Manage Server)
+      add: name, price, [description], [role to grant on purchase]
+      remove: name
+
+═══════════════════════════════════════════════════════════════
+4. MODERATION
+═══════════════════════════════════════════════════════════════
+
+All actions are logged as numbered cases in the database.
+Requires Moderate Members permission unless noted.
+
+Commands:
+  /ban <user> [reason] [delete_days]    — Ban a user (Ban Members)
+  /unban <user> [reason]                — Unban a user (Ban Members)
+  /kick <user> [reason]                 — Kick a member (Kick Members)
+  /timeout <user> <seconds> [reason]    — Timeout a member
+  /untimeout <user> [reason]            — Remove timeout
+  /warn <user> <reason>                 — Issue a warning
+  /purge <amount> (1-100)              — Bulk delete messages (Manage Messages)
+  /lock [channel]                       — Lock a channel (Manage Channels)
+  /unlock [channel]                     — Unlock a channel
+  /cases [user]                         — View recent cases (last 10)
+  /case <id>                            — View individual case details
+
+═══════════════════════════════════════════════════════════════
+5. MOD DASHBOARD (Interactive Panel)
+═══════════════════════════════════════════════════════════════
+
+A persistent message-based control panel in a channel of your choice.
+No slash commands needed once set up — everything is done via
+buttons and modals on the panel message.
+
+Commands:
+  /moddashboard setup       — Create the panel in the current channel
+  /moddashboard remove      — Delete the panel
+
+Panel features:
+  • Main view: server stats, navigation buttons
+  • User Lookup: enter a user ID via modal popup
+      → Shows user info + Recent Cases
+      → Action buttons: Warn, Timeout, Kick, Ban
+      → Each action opens a reason (and duration) modal
+  • Recent Cases: view last 10 moderation cases
+  • Refresh button
+
+═══════════════════════════════════════════════════════════════
+6. TICKET SYSTEM
+═══════════════════════════════════════════════════════════════
+
+Full-featured ticket system using threads or channels.
+
+Commands:
+  /ticket config view            — View current ticket configuration
+  /ticket config category <cat>  — Set the category for ticket channels
+  /ticket config logchannel <ch> — Set the ticket log channel
+  /ticket config supportrole <r> — Toggle a support role (add/remove)
+  /ticket config pingrole        — Set role pinged for thread ticket
+       categories: Server Inquiries, Server Reports, Staff Reports, HSR Questions
+  /ticket claim                  — Claim the current ticket
+  /ticket close [reason]         — Close the current ticket
+  /ticket reopen <id>            — Reopen a closed ticket
+  /ticket priority <id> <level>  — Set priority (Low/Medium/High/Urgent)
+  /ticket note <content>         — Add internal note to current ticket
+  /ticket rename <name>          — Rename the current ticket channel
+  /ticket search [user] [status] [category]  — Search tickets
+  /ticket stats                  — Show ticket analytics
+  /ticketmessagecreate           — Send a ticket creation panel
+       (creates a select-menu panel for users to open tickets)
+
+Features:
+  • Category selection dropdown with optional subject modal
+  • Claim/unclaim workflow
+  • Priority system
+  • Internal staff notes
+  • Transcript saving (HTML + JSON in data/transcripts/)
+  • Ping roles per ticket category
+  • Support role whitelist
+
+═══════════════════════════════════════════════════════════════
+7. TAGS (Canned Responses)
+═══════════════════════════════════════════════════════════════
+
+Reusable embed templates for staff. Tags are stored per guild.
+
+Commands:
+  /tag create <name> [content]       — Create a new tag
+  /tag edit <name>                   — Edit an existing tag
+  /tag delete <name>                 — Delete a tag
+  /tag list                          — List all tags
+  /tag show <name>                   — Preview a tag
+  /tag use <name>                    — Send a tag to the current channel
+  /tag info <name>                   — Show tag usage stats
+  /tag export                        — Export all tags as JSON
+  /tag import                        — Import tags from JSON file
+
+Prefix: !<tagname> in any channel.
+
+═══════════════════════════════════════════════════════════════
+8. TO-DO LIST
+═══════════════════════════════════════════════════════════════
+
+Shared per-guild to-do list.
+
+Commands:
+  /todolist add       — Add a new item
+  /todolist list      — List all items
+  /todolist edit      — Edit an item
+  /todolist remove    — Remove an item
+  /todolist clear     — Clear all items
+
+Prefix: !todolist add|list|edit|remove|clear
+
+═══════════════════════════════════════════════════════════════
+9. WELCOME / GOODBYE
+═══════════════════════════════════════════════════════════════
+
+Customisable join/leave messages with placeholder variables.
+
+Commands:
+  /welcome set [channel] [message] [toggle]
+      — Configure welcome (variables: {user}, {server})
+  /welcome test                    — Test the welcome message
+  /goodbye set [channel] [message] [toggle]
+      — Configure goodbye
+  /goodbye test                   — Test the goodbye message
+
+═══════════════════════════════════════════════════════════════
+10. AUTO-ROLE
+═══════════════════════════════════════════════════════════════
+
+Assign one or more roles to every new member on join.
+
+Commands:
+  /autorole add <role>      — Add a role to auto-assign
+  /autorole remove <role>   — Remove a role
+  /autorole list            — List all auto-assigned roles
+
+═══════════════════════════════════════════════════════════════
+11. REACTION ROLES
+═══════════════════════════════════════════════════════════════
+
+Dropdown-based role selection panels.
+
+Commands:
+  /reactionroles create [channel] [title] [description]
+      — Create a new reaction role panel
+  /reactionroles add <channel> <message_id> <role> [emoji] [label] [desc]
+      — Add a role option to an existing panel
+  /reactionroles remove <message_id> [emoji]
+      — Remove a role (or all roles) from a panel
+  /reactionroles list
+      — List all reaction role panels
+
+═══════════════════════════════════════════════════════════════
+12. GIVEAWAYS
+═══════════════════════════════════════════════════════════════
+
+Full giveaway system with automatic winner selection.
+
+Commands:
+  /giveaway create <prize> <duration> [winners] [channel] [description]
+      — Create a new giveaway (reaction to enter)
+  /giveaway end <message_id>      — End a giveaway early
+  /giveaway reroll <message_id>   — Reroll winner(s)
+  /giveaway delete <message_id>   — Delete a giveaway
+  /giveaway list                  — List all active giveaways
+
+═══════════════════════════════════════════════════════════════
+13. SERVER STATS (Voice Channel Counters)
+═══════════════════════════════════════════════════════════════
+
+Live voice channel counters that update automatically.
+
+Commands:
+  /serverstats set [category] [prefix]
+      — Create counter channels (Members, Bots, Voice)
+  /serverstats remove     — Remove counter channels
+  /serverstats view       — View current config
+
+═══════════════════════════════════════════════════════════════
+14. JOIN-TO-CREATE (Temp Voice Channels)
+═══════════════════════════════════════════════════════════════
+
+Users join a designated voice channel to spawn a temporary,
+custom-named voice channel that auto-deletes when empty.
+
+Commands:
+  /jointocreate set <channel> [category] [format]
+      — Configure (format uses {user} placeholder)
+  /jointocreate remove   — Disable
+  /jointocreate view     — View config
+
+═══════════════════════════════════════════════════════════════
+15. BIRTHDAYS
+═══════════════════════════════════════════════════════════════
+
+Per-user birthday tracking (MM/DD format).
+
+Commands:
+  /birthday set <MM/DD> [timezone]
+      — Set your birthday
+  /birthday remove       — Remove your birthday
+  /birthday list         — List all birthdays in the server
+
+═══════════════════════════════════════════════════════════════
+16. LOGGING (Message & Reaction)
+═══════════════════════════════════════════════════════════════
+
+Archives message edits/deletes and reaction adds/removes
+to the database.
+
+Commands:
+  /logging messages       — Toggle message logging
+  /logging reactions      — Toggle reaction logging
+
+Prefix: !logmessages on|off, !logreactions on|off
+        !modchannel #channel [messages:on|off] [reactions:on|off]
+
+═══════════════════════════════════════════════════════════════
+17. AUTO SLOWMODE
+═══════════════════════════════════════════════════════════════
+
+Automatically adjusts channel slowmode when message rate exceeds
+a threshold within a time window. Persists across restarts.
+
+Commands:
+  /slowmode       — Enable/disable auto slowmode in current channel
+  Prefix: !slowmode on|off
+
+═══════════════════════════════════════════════════════════════
+18. SLUMBER GUARD (Anti-Raid Slowmode)
+═══════════════════════════════════════════════════════════════
+
+Preset-based anti-raid system. Detects unusual message volume from
+multiple unique users and activates slowmode automatically.
+
+Commands:
+  /slumberguard help                     — List all presets
+  /slumberguard set <channel> <preset> [toggle]
+      — Apply a preset to a channel
+  /slumberguard list                     — List configured channels
+  /slumberguard preset view|custom|delete <name> [...]
+      — Manage custom presets
+  /slumberguard reset                    — Reset all presets to defaults
+
+Default presets: relaxed, default, strict, locked
+Each preset defines: threshold_users, threshold_time, slowmode_time,
+slowmode_length, min_messages
+
+═══════════════════════════════════════════════════════════════
+19. AUTO-MODERATION (Custom Rules)
+═══════════════════════════════════════════════════════════════
+
+Define custom auto-mod rules with conditions and actions.
+
+Conditions: keyword, regex, mentions, emotes, links, caps, spoilers,
+            attachments
+Actions: delete, warn, timeout, log
+
+Commands:
+  /automod list          — List all rules
+  /automod create        — Create a new rule
+  /automod view <name>   — View rule details
+  /automod toggle <name> — Enable or disable a rule
+  /automod remove <name> — Delete a rule
+
+═══════════════════════════════════════════════════════════════
+20. STICKER SENTINEL
+═══════════════════════════════════════════════════════════════
+
+Detects forwarded messages containing external stickers and
+alerts staff.
+
+Commands:
+  /stickers       — Enable or disable forwarded sticker detection
+
+═══════════════════════════════════════════════════════════════
+21. AI CHAT (LLM Integration)
+═══════════════════════════════════════════════════════════════
+
+Per-channel AI chat using any OpenAI-compatible API.
+Requires LLM_API_KEY in .env.
+
+Commands:
+  /llm channel set <channel> [prompt]
+      — Enable AI replies in a channel (custom system prompt optional)
+  /llm channel disable [channel]
+      — Disable AI replies
+  /llm config [channel]
+      — View current LLM config
+  /llm clear [channel]
+      — Clear chat memory for a channel
+
+Features:
+  • Only responds to messages that don't start with !
+  • Maintains conversation memory (stores last 50 msg pairs per channel)
+  • Supports any OpenAI-compatible endpoint (set LLM_BASE_URL)
+  • Custom system prompt per channel
+  • Shows typing indicator while generating
+
+Supported providers (any OpenAI-compatible /v1/chat/completions API):
+  — OpenAI (gpt-4o-mini, gpt-4o, etc.)
+  — Ollama (local, http://localhost:11434/v1)
+  — OpenRouter
+  — Claude via proxy
+
+═══════════════════════════════════════════════════════════════
+22. TRIAL APPLICATIONS (Custom Forms)
+═══════════════════════════════════════════════════════════════
+
+Multi-step application forms with custom questions, submitted via DM.
+
+Commands:
+  /trialapp channel set <ch>    — Set where new app threads appear
+  /trialapp channel remove      — Remove the channel
+  /makeapp                      — Create a custom application form
+      (guided: form name → questions → review)
+  /applicationforms             — Start an application (run in bot DMs)
+
+Flow: User runs /applicationforms in DM → selects a form →
+answers questions in DM → staff review in a thread.
+
+═══════════════════════════════════════════════════════════════
+23. VERIFICATION PANEL
+═══════════════════════════════════════════════════════════════
+
+Creates a webhook-based verification button panel.
+Users click the button to receive a role.
+
+Command:
+  /verifypanel  — Create a verification panel in the current channel
+
+═══════════════════════════════════════════════════════════════
+24. STYLED EMBEDS
+═══════════════════════════════════════════════════════════════
+
+Send a styled embed that visually wraps around a dropdown selector.
+Useful for decorative info panels.
+
+Command:
+  /styledembed [title] [description]
+      — Sends the styled embed + dropdown to the current channel
+
+═══════════════════════════════════════════════════════════════
+25. BOT PERMISSIONS (Role-based Command Control)
+═══════════════════════════════════════════════════════════════
+
+Restrict any slash command to specific roles.
+
+Commands:
+  /botperms list            — List all command permission overrides
+  /botperms change          — Change which roles can use a command
+
+═══════════════════════════════════════════════════════════════
+26. COMMAND PERMISSIONS REFERENCE
+═══════════════════════════════════════════════════════════════
+
+Permission Required         Commands
+───────────────────────     ─────────────────────────────────
+Manage Server               /logging, /ticket config, /stop,
+                            /slowmode, /stickers, /addxp, /xpclear,
+                            /weeklyreset, /verifypanel, /botperms,
+                            /levelupnotification, /levelrole,
+                            /trialapp, /makeapp, /styledembed,
+                            /automod, /welcome, /goodbye, /autorole,
+                            /reactionroles, /giveaway, /serverstats,
+                            /jointocreate, /birthday, /llm,
+                            /slumberguard, /moddashboard,
+                            /shopadmin, /modchannel
+
+Moderate Members           /warn, /timeout, /untimeout, /purge,
+                            /cases, /case
+
+Ban Members                 /ban, /unban
+Kick Members                /kick
+Manage Messages             /purge
+Manage Channels             /lock, /unlock
+None (everyone)            /help, /rank, /leaderboard, /weekly,
+                            /top3, /balance, /daily, /work, /beg,
+                            /gamble, /pay, /rob, /deposit, /withdraw,
+                            /shop, /buy, /inventory, /ecoleaderboard,
+                            /tag, /birthday, /rankcard, /ticket (claim,
+                            close, note, rename), /applicationforms
+
+═══════════════════════════════════════════════════════════════
+27. PREFIX (!) COMMANDS
+═══════════════════════════════════════════════════════════════
+
+Available alongside their slash equivalents:
+
+  !help                    — Send help to current channel
+  !rank [@user]            — Show rank card
+  !ticket [add|close|claim]  — Quick ticket actions
+  !todolist add|list|edit|remove|clear
+  !tag <name>              — Alias for /tag use
+  !<tagname>               — Direct tag invocation
+  !modchannel #ch [messages:on|off] [reactions:on|off]
+  !logmessages on|off      — Toggle message logging
+  !logreactions on|off     — Toggle reaction logging
+  !slowmode on|off         — Toggle auto slowmode
+  !stop                    — Shut down the bot
+  !tickets list            — List tickets
+  !bal [@user]             — Check balance
+
+═══════════════════════════════════════════════════════════════
+28. WEB DASHBOARD
+═══════════════════════════════════════════════════════════════
+
+Express.js-based web dashboard launched alongside the bot.
+Runs on port 3000 (configurable via PORT env var).
+
+Features:
+  • Discord OAuth2 login
+  • Web-based ticket management (view, close, reopen)
+  • To-do list management
+  • Logging configuration
+  • Auto-slowmode configuration
+  • Mod channel configuration
+  • Infractions viewer
+  • Per-guild scope (switch between servers)
+
+Launch: handled automatically by start.js (spawns bot + dashboard
+as child processes).
+
+═══════════════════════════════════════════════════════════════
+29. ENVIRONMENT VARIABLES
+═══════════════════════════════════════════════════════════════
+
+Required (in .env file or system env):
+
+  DISCORD_TOKEN             Discord bot token (from Discord Developer Portal)
+  GUILD_ID                  ID of the main guild for command registration
+  CLIENT_ID                 Discord application client ID
+
+Optional:
+
+  LLM_API_KEY               API key for AI chat feature
+  LLM_MODEL                 Model name (default: gpt-4o-mini)
+  LLM_BASE_URL              API base URL (default: https://api.openai.com/v1)
+  PORT                      Web dashboard port (default: 3000)
+  CLIENT_SECRET             OAuth2 secret for web dashboard login
+  DASHBOARD_URL             Public URL for OAuth2 redirect
+  SESSION_SECRET            Express session secret
+
+═══════════════════════════════════════════════════════════════
+END OF FEATURE LIST
+═══════════════════════════════════════════════════════════════

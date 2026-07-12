@@ -1,3 +1,28 @@
+      </div>
+    </main>
   </div>
+  <script>
+    function toggleDropdown(id) {
+      document.querySelectorAll('.dropdown.open').forEach(function(d) {
+        if (d.id !== id) d.classList.remove('open');
+      });
+      var el = document.getElementById(id);
+      if (el) el.classList.toggle('open');
+    }
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.server-selector') && !e.target.closest('.user')) {
+        document.querySelectorAll('.dropdown').forEach(function(d) { d.classList.remove('open'); });
+      }
+    });
+    function toggleSidebar() {
+      var s = document.getElementById('sidebar');
+      if (s) s.classList.toggle('closed');
+    }
+    document.querySelectorAll('.path.clickable .top').forEach(function(el) {
+      el.addEventListener('click', function() {
+        el.parentElement.classList.toggle('open');
+      });
+    });
+  </script>
 </body>
 </html>

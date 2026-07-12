@@ -3,17 +3,104 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= title || 'Dashboard' %> — Mod Bot</title>
+  <title><%= title || 'Dashboard' %> — ProbeBot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <nav>
-    <a href="/" class="brand">Mod Bot</a>
-    <a href="/infractions" class="<%= active === 'infractions' ? 'active' : '' %>">Infractions</a>
-    <a href="/tickets" class="<%= active === 'tickets' ? 'active' : '' %>">Tickets</a>
-    <a href="/todos" class="<%= active === 'todos' ? 'active' : '' %>">Todo List</a>
-    <a href="/logging" class="<%= active === 'logging' ? 'active' : '' %>">Logging</a>
-    <a href="/slowmode" class="<%= active === 'slowmode' ? 'active' : '' %>">Slowmode</a>
-    <a href="/modchannel" class="<%= active === 'modchannel' ? 'active' : '' %>">Mod Channel</a>
+  <nav class="navbar">
+    <div class="burger" onclick="toggleSidebar()" id="burgerBtn">
+      <div class="line"></div>
+      <div class="line"></div>
+      <div class="line"></div>
+    </div>
+    <div class="branding">
+      <div class="logo">P</div>
+      <span class="name">ProbeBot</span>
+    </div>
+    <% if (locals.guildId) { %>
+      <div class="server-selector" onclick="toggleDropdown('serverDropdown')">
+        <div class="icon">
+          <% var g = (locals.guilds || []).find(x => x.id === guildId) %>
+          <% if (g && g.icon) { %>
+            <img src="https://cdn.discordapp.com/icons/<%= g.id %>/<%= g.icon %>.png" alt="">
+          <% } else { %>
+            <%= g ? g.name.charAt(0).toUpperCase() : '#' %>
+          <% } %>
+        </div>
+        <span class="name"><%= g ? g.name : guildId %></span>
+        <span class="arrow">&#9662;</span>
+        <div class="dropdown server-dropdown" id="serverDropdown">
+          <% for (const sg of (locals.guilds || [])) { %>
+            <a href="/<%= sg.id %>/home" class="option">
+              <div class="opt-icon">
+                <% if (sg.icon) { %>
+                  <img src="https://cdn.discordapp.com/icons/<%= sg.id %>/<%= sg.icon %>.png" alt="">
+                <% } else { %>
+                  <%= sg.name.charAt(0).toUpperCase() %>
+                <% } %>
+              </div>
+              <span class="opt-name"><%= sg.name %></span>
+            </a>
+          <% } %>
+        </div>
+      </div>
+    <% } else { %>
+      <div style="font-size:13px;color:var(--text-muted);">Select a server</div>
+    <% } %>
+    <div class="spacer"></div>
+    <% if (locals.user) { %>
+      <div class="user" onclick="toggleDropdown('userDropdown')">
+        <div class="avatar">
+          <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="" onerror="this.style.display='none'">
+        </div>
+        <span class="username"><%= user.username %></span>
+        <span class="arrow">&#9662;</span>
+        <div class="dropdown user-dropdown" id="userDropdown">
+          <a href="/logout" class="option">Log out</a>
+        </div>
+      </div>
+    <% } %>
   </nav>
-  <div class="container">
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <nav class="sidebar-nav">
+        <div class="intro-line">
+          <a href="/" class="home-btn">&#9632;</a>
+          <div style="flex:1;"></div>
+        </div>
+        <% var pages = [
+          { id: 'dashboard', label: 'Dashboard', path: 'home', icon: '&#9632;' },
+          { id: 'infractions', label: 'Infractions', path: 'infractions', icon: '&#9888;' },
+          { id: 'tickets', label: 'Tickets', path: 'tickets', icon: '&#9993;' },
+        ]; %>
+        <% var managementPages = [
+          { id: 'todos', label: 'Todo List', path: 'todos', icon: '&#9744;' },
+          { id: 'logging', label: 'Logging', path: 'logging', icon: '&#9881;' },
+          { id: 'slowmode', label: 'Slowmode', path: 'slowmode', icon: '&#9201;' },
+          { id: 'modchannel', label: 'Mod Channel', path: 'modchannel', icon: '&#128172;' },
+        ]; %>
+        <% if (locals.guildId) { %>
+          <% for (const p of pages) { %>
+            <a href="/<%= guildId %>/<%= p.path %>" class="sidebar-item <%= active === p.id ? 'selected' : '' %>">
+              <span class="icon"><%- p.icon %></span>
+              <span><%= p.label %></span>
+              <div class="bar"></div>
+            </a>
+          <% } %>
+          <div class="label">Management</div>
+          <% for (const p of managementPages) { %>
+            <a href="/<%= guildId %>/<%= p.path %>" class="sidebar-item <%= active === p.id ? 'selected' : '' %>">
+              <span class="icon"><%- p.icon %></span>
+              <span><%= p.label %></span>
+              <div class="bar"></div>
+            </a>
+          <% } %>
+        <% } %>
+      </nav>
+    </aside>
+    <main class="content">
+      <div class="content-inner">

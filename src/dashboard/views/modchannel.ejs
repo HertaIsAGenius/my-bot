@@ -1,56 +1,47 @@
 <%- include('header', { title: 'Mod Channel', active: 'modchannel' }) %>
   <div class="page-header">
-    <h1>Moderator Channel Configuration</h1>
+    <div class="icon">&#128172;</div>
+    <h1>Moderator Channel</h1>
   </div>
 
-  <div class="section">
-    <h2>Configured Guilds</h2>
-    <% var guildIds = Object.keys(meta); %>
-    <% var configured = guildIds.filter(g => meta[g]?.moderatorChannel); %>
-    <% if (configured.length === 0) { %>
-      <div class="empty"><p>No moderator channels configured. Use <code>/modchannel</code> or <code>!modchannel #channel</code> in Discord, or add one below.</p></div>
-    <% } else { %>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Guild ID</th>
-              <th>Channel ID</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% for (const guildId of configured) { %>
-              <tr>
-                <td><code><%= guildId %></code></td>
-                <td><code><%= meta[guildId].moderatorChannel %></code></td>
-                <td>
-                  <form method="POST" action="/modchannel" class="inline-form" onsubmit="return confirm('Remove this configuration?')">
-                    <input type="hidden" name="guildId" value="<%= guildId %>">
-                    <input type="hidden" name="channelId" value="">
-                    <button class="btn btn-danger btn-sm">Remove</button>
-                  </form>
-                </td>
-              </tr>
-            <% } %>
-          </tbody>
-        </table>
+  <% var m = meta[guildId]; %>
+  <div class="path">
+    <div class="top">
+      <div class="text">
+        <div class="name">Current Channel</div>
+        <div class="description">
+          <% if (m && m.moderatorChannel) { %>
+            Channel set to <code style="opacity:.6;"><%= m.moderatorChannel %></code>
+          <% } else { %>
+            No moderator channel configured for this server.
+          <% } %>
+        </div>
       </div>
-    <% } %>
+      <div class="right-side">
+        <% if (m && m.moderatorChannel) { %>
+          <form method="POST" action="/<%= guildId %>/modchannel" onsubmit="return confirm('Remove configuration?')">
+            <input type="hidden" name="channelId" value="">
+            <button class="btn btn-danger btn-sm">Remove</button>
+          </form>
+        <% } %>
+      </div>
+    </div>
   </div>
 
-  <div class="section">
-    <h2>Add or Update</h2>
-    <form method="POST" action="/modchannel" style="display: flex; gap: 8px; align-items: flex-end;">
-      <div class="form-group" style="flex: 1;">
-        <label>Guild ID</label>
-        <input name="guildId" placeholder="e.g. 123456789012345678" required>
+  <div class="section-label">Set Channel</div>
+
+  <div class="path">
+    <div class="top">
+      <div class="text">
+        <div class="name">New Channel</div>
+        <div class="description">Enter a channel ID to set as the moderator channel.</div>
       </div>
-      <div class="form-group" style="flex: 1;">
-        <label>Channel ID</label>
-        <input name="channelId" placeholder="e.g. 123456789012345678" required>
+      <div class="right-side">
+        <form method="POST" action="/<%= guildId %>/modchannel" style="display:flex;gap:8px;align-items:center;">
+          <input name="channelId" placeholder="e.g. 123456789012345678" required style="width:200px;">
+          <button class="btn btn-primary">Save</button>
+        </form>
       </div>
-      <button class="btn btn-primary">Save</button>
-    </form>
+    </div>
   </div>
 <%- include('footer') %>

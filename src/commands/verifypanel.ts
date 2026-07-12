@@ -10,6 +10,7 @@ import {
   GuildMember,
   MessageFlags
 } from 'discord.js';
+import { embed } from '../utils/embed';
 
 export default async function verifypanelCommand(interaction: ChatInputCommandInteraction) {
   const modal = new ModalBuilder()
@@ -75,14 +76,14 @@ export async function handleVerifyPanelSubmit(interaction: any) {
 
   const guild = interaction.guild;
   if (!guild) {
-    await interaction.reply({ content: 'This must be used in a server.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Error', 'This must be used in a server.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
   const roleId = roleInput.replace(/[<@&>]/g, '');
   const role = guild.roles.cache.get(roleId);
   if (!role) {
-    await interaction.reply({ content: 'Invalid role. Please provide a valid role ID or mention.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Invalid Role', 'Please provide a valid role ID or mention.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -91,7 +92,7 @@ export async function handleVerifyPanelSubmit(interaction: any) {
   try {
     const channel = interaction.channel as TextChannel;
     if (!channel.isTextBased() || channel.isDMBased()) {
-      await interaction.editReply({ content: 'This command must be used in a text channel.' });
+      await interaction.editReply({ embeds: [embed('Error', 'This command must be used in a text channel.')] });
       return;
     }
 
@@ -115,9 +116,9 @@ export async function handleVerifyPanelSubmit(interaction: any) {
 
     await webhook.send({ content: messageText, components: [row] });
 
-    await interaction.editReply({ content: `Verification panel sent in ${channel} with role **@${role.name}**.` });
+    await interaction.editReply({ embeds: [embed('Verification Panel Sent', `Verification panel sent in ${channel} with role **@${role.name}**.`)] });
   } catch (e: any) {
-    await interaction.editReply({ content: `Failed to create verification panel: ${e.message}` });
+    await interaction.editReply({ embeds: [embed('Error', `Failed to create verification panel: ${e.message}`)] });
   }
 }
 
@@ -126,25 +127,25 @@ export async function handleVerifyButton(interaction: any) {
   const member = interaction.member as GuildMember;
 
   if (!member || !interaction.guild) {
-    await interaction.reply({ content: 'This must be used in a server.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Error', 'This must be used in a server.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
   const role = interaction.guild.roles.cache.get(roleId);
   if (!role) {
-    await interaction.reply({ content: 'The role no longer exists.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Role Not Found', 'The role no longer exists.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
   if (member.roles.cache.has(roleId)) {
-    await interaction.reply({ content: 'You already have this role!', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Already Verified', 'You already have this role!')], flags: MessageFlags.Ephemeral });
     return;
   }
 
   try {
     await member.roles.add(roleId);
-    await interaction.reply({ content: `You have been given the **@${role.name}** role.`, flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Verified', `You have been given the **@${role.name}** role.`)], flags: MessageFlags.Ephemeral });
   } catch (e: any) {
-    await interaction.reply({ content: `Failed to add role: ${e.message}`, flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Error', `Failed to add role: ${e.message}`)], flags: MessageFlags.Ephemeral });
   }
 }

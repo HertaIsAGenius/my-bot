@@ -10,16 +10,16 @@ import {
   PermissionsBitField,
   MessageFlags
 } from 'discord.js';
-import { COLORS } from '../utils/embed';
+import { embed, COLORS } from '../utils/embed';
 import { isStickerDetectionEnabled, setStickerDetectionEnabled } from '../utils/stickers';
 
 async function stickersCommand(interaction: ChatInputCommandInteraction) {
   if (!interaction.guild) {
-    await interaction.reply({ content: 'This command must be used in a server.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Guild Only', 'This command must be used in a server.')], flags: MessageFlags.Ephemeral });
     return;
   }
   if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageGuild)) {
-    await interaction.reply({ content: 'You need **Manage Server** permission.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Permission Denied', 'You need **Manage Server** permission.')], flags: MessageFlags.Ephemeral });
     return;
   }
   const current = isStickerDetectionEnabled(interaction.guild.id);

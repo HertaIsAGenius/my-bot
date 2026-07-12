@@ -1,165 +1,67 @@
-import { ChatInputCommandInteraction, AttachmentBuilder, EmbedBuilder, MessageFlags } from 'discord.js';
-import { createCanvas, loadImage } from '@napi-rs/canvas';
+import { ChatInputCommandInteraction, EmbedBuilder, MessageFlags } from 'discord.js';
+import { embed } from '../utils/embed';
 import { getWeeklyLeaderboard, xpForLevel } from '../utils/levels';
-import { HSR_BG, HSR_GOLD, HSR_TEAL, HSR_MUTE, HSR_DARK, HSR_BAR_BG, FONT, hexPath, loadAvatarBuffer, backdropSlice, goldAccent } from '../utils/canvas';
+import { LeaderboardEntry } from '../utils/leaderboardRenderer';
+import { loadAvatarBuffer } from '../utils/canvas';
+import { createSession, generateToken, renderPageAndBuildContainer } from '../utils/leaderboardSession';
 
-const S = 1.2;
-const ROW_H = Math.round(90 * S);
-const HEADER_H = Math.round(70 * S);
-const PAD = Math.round(20 * S);
-const W = Math.round(900 * S);
-const LIMIT = 5;
+const PAGE_SIZE = 10;
+const MAX_ENTRIES = 50;
 
 async function weeklyCommand(interaction: ChatInputCommandInteraction) {
   if (!interaction.guild) {
-    await interaction.reply({ content: 'This command must be used in a server.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Guild Only', 'This command must be used in a server.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
   await interaction.deferReply();
 
-  const entries = getWeeklyLeaderboard(interaction.guild.id, LIMIT);
+  const entries = getWeeklyLeaderboard(interaction.guild.id, MAX_ENTRIES);
   if (entries.length === 0) {
-    await interaction.editReply({
-      embeds: [new EmbedBuilder().setColor(0x2B3A67).setTitle('Weekly Leaderboard').setDescription('No weekly XP data yet — start chatting to earn XP!')]
-    });
+    await interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x2B3A67).setTitle('Weekly Leaderboard').setDescription('No weekly XP data yet — start chatting to earn XP!')] });
     return;
   }
 
-  const users = await Promise.all(entries.map(e =>
+  const members = await Promise.all(entries.map(e =>
     interaction.guild!.members.fetch(e.userId)
-      .then(m => m.user)
-      .catch(() => interaction.client.users.fetch(e.userId).catch(() => null))
+      .then(m => ({ user: m.user, nickname: m.displayName }))
+      .catch(() => interaction.client.users.fetch(e.userId).then(u => ({ user: u, nickname: u.username })).catch(() => ({ user: null as any, nickname: 'Unknown' })))
   ));
 
-  const totalH = HEADER_H + entries.length * ROW_H + Math.round(30 * S);
-  const canvas = createCanvas(W, totalH);
-  const ctx = canvas.getContext('2d');
-
-  // Background
-  ctx.fillStyle = HSR_BG;
-  ctx.fillRect(0, 0, W, totalH);
-
-  // Backdrop and accents
-  backdropSlice(ctx, W * 0.35, W * 0.22);
-  goldAccent(ctx, W * 0.37, 0, W * 0.24, totalH, 4);
-
-  // Header
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.font = `bold ${Math.round(22 * S)}px ${FONT}`;
-  ctx.fillStyle = HSR_GOLD;
-  ctx.fillText(`${interaction.guild.name} — WEEKLY LEADERBOARD`, PAD, Math.round(20 * S));
-
+  const lbEntries: LeaderboardEntry[] = [];
+  const avatarPromises: Promise<Buffer | null>[] = [];
   for (let i = 0; i < entries.length; i++) {
     const e = entries[i];
-    const user = users[i];
-    const y = HEADER_H + i * ROW_H;
-    const rank = i + 1;
-    const isTop3 = i < 3;
-    const rankColors = [HSR_GOLD, '#C0C0C0', '#CD7F32'];
-    const rc = isTop3 ? rankColors[i] : HSR_MUTE;
-    const weeklyXp = e.weeklyXp ?? 0;
+    const { user, nickname } = members[i];
     const totalNeeded = xpForLevel(e.level + 1);
-
-    // Row background
-    ctx.fillStyle = i % 2 === 0 ? 'rgba(20, 26, 38, 0.5)' : 'rgba(12, 15, 23, 0.5)';
-    ctx.fillRect(0, y, W, ROW_H);
-
-    // Rank hex badge
-    const badgeR = Math.round(18 * S);
-    const badgeCx = PAD + badgeR + Math.round(5 * S);
-    const badgeCy = y + ROW_H / 2;
-    ctx.fillStyle = rc + '33';
-    hexPath(ctx, badgeCx, badgeCy, badgeR);
-    ctx.fill();
-    ctx.strokeStyle = rc;
-    ctx.lineWidth = 2;
-    hexPath(ctx, badgeCx, badgeCy, badgeR);
-    ctx.stroke();
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = `bold ${Math.round(16 * S)}px ${FONT}`;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(`#${rank}`, badgeCx, badgeCy);
-    ctx.textAlign = 'left';
-
-    // Avatar hex
-    const avR = Math.round(28 * S);
-    const avCx = badgeCx + badgeR + Math.round(25 * S);
-    const avCy = y + ROW_H / 2;
-
-    ctx.save();
-    hexPath(ctx, avCx, avCy, avR);
-    ctx.clip();
-    if (user) {
-      const buf = await loadAvatarBuffer(user.displayAvatarURL({ extension: 'png', size: 128 }));
-      if (buf) {
-        try {
-          const img = await loadImage(buf);
-          ctx.drawImage(img, avCx - avR, avCy - avR, avR * 2, avR * 2);
-        } catch {}
-      }
-    }
-    ctx.restore();
-
-    // Avatar ring
-    ctx.strokeStyle = isTop3 ? rc : HSR_TEAL;
-    ctx.lineWidth = 2;
-    hexPath(ctx, avCx, avCy, avR + 2);
-    ctx.stroke();
-
-    const textX = avCx + avR + Math.round(20 * S);
-
-    // Username
-    ctx.textBaseline = 'top';
-    ctx.font = `bold ${Math.round(17 * S)}px ${FONT}`;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(user?.username || 'Unknown', textX, y + Math.round(12 * S));
-
-    // Level (right-aligned)
-    ctx.textAlign = 'right';
-    ctx.font = `${Math.round(15 * S)}px ${FONT}`;
-    ctx.fillStyle = HSR_GOLD;
-    ctx.fillText(`Level ${e.level}`, W - PAD, y + Math.round(12 * S));
-    ctx.textAlign = 'left';
-
-    // XP bar
-    const barX = textX;
-    const barY = y + Math.round(44 * S);
-    const barW = Math.round(360 * S);
-    const barH = Math.round(12 * S);
-    const barR = barH / 2;
-    const pct = Math.min(weeklyXp / Math.max(totalNeeded, 1), 1);
-
-    ctx.fillStyle = HSR_BAR_BG;
-    ctx.beginPath();
-    ctx.roundRect(barX, barY, barW, barH, barR);
-    ctx.fill();
-
-    if (pct > 0) {
-      ctx.fillStyle = isTop3 ? rc : HSR_TEAL;
-      ctx.beginPath();
-      ctx.roundRect(barX, barY, barW * pct, barH, barR);
-      ctx.fill();
-    }
-
-    // Weekly XP text
-    ctx.font = `${Math.round(13 * S)}px ${FONT}`;
-    ctx.fillStyle = HSR_MUTE;
-    ctx.fillText(`${weeklyXp.toLocaleString()} Weekly XP`, textX, y + Math.round(62 * S));
+    avatarPromises.push(user ? loadAvatarBuffer(user.displayAvatarURL({ extension: 'png', size: 128 })) : Promise.resolve(null));
+    lbEntries.push({
+      title: nickname,
+      username: user?.username || 'Unknown',
+      avatarBuffer: null,
+      rank: i + 1,
+      level: e.level,
+      exp: e.xp,
+      weeklyExp: e.weeklyXp,
+      expMax: totalNeeded,
+    });
+  }
+  const avatarBuffers = await Promise.all(avatarPromises);
+  for (let i = 0; i < lbEntries.length; i++) {
+    lbEntries[i].avatarBuffer = avatarBuffers[i];
   }
 
-  // Footer
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-  ctx.font = `${Math.round(11 * S)}px ${FONT}`;
-  ctx.fillStyle = HSR_MUTE;
-  ctx.fillText('Weekly XP resets via /weeklyreset', W / 2, totalH - Math.round(8 * S));
+  const totalPages = Math.ceil(lbEntries.length / PAGE_SIZE);
+  const token = generateToken();
+  createSession(token, { entries: lbEntries, guildName: interaction.guild.name, mode: 'weekly', page: 1, totalPages });
 
-  const buf = await canvas.toBuffer('image/png');
-  const attachment = new AttachmentBuilder(buf, { name: 'weekly.png' });
-  await interaction.editReply({ files: [attachment] });
+  const result = await renderPageAndBuildContainer(token);
+  if (!result) {
+    await interaction.editReply({ embeds: [embed('Error', 'Failed to render leaderboard.')] });
+    return;
+  }
+
+  await interaction.editReply({ files: result.files, components: result.components, flags: MessageFlags.IsComponentsV2 });
 }
 
 module.exports = { default: weeklyCommand };

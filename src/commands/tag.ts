@@ -215,7 +215,7 @@ async function listFlow(interaction: ChatInputCommandInteraction, guild: Guild) 
   const col = msg.createMessageComponentCollector<ComponentType.Button>({ componentType: ComponentType.Button, time: 120000 });
   col.on('collect', async (btn) => {
     if (btn.user.id !== interaction.user.id) {
-      await btn.reply({ content: 'Not for you.', flags: MessageFlags.Ephemeral });
+      await btn.reply({ embeds: [embed('Not for You', 'This button is not for you.')], flags: MessageFlags.Ephemeral });
       return;
     }
     if (btn.customId === 'tag_list_prev') page = Math.max(0, page - 1);
@@ -276,7 +276,7 @@ async function exportFlow(interaction: ChatInputCommandInteraction, guild: Guild
   const os = require('node:os');
   const filePath = path.join(os.tmpdir(), `tags-${guild.id}.json`);
   fs.writeFileSync(filePath, json, 'utf-8');
-  await interaction.reply({ content: `Exported **${entries.length}** tag(s).`, files: [filePath], flags: MessageFlags.Ephemeral });
+  await interaction.reply({ embeds: [embed('Tags Exported', `Exported **${entries.length}** tag(s).`)], files: [filePath], flags: MessageFlags.Ephemeral });
   fs.unlink(filePath, () => {});
 }
 
@@ -303,7 +303,7 @@ async function handleImportSubmit(interaction: any, guild: Guild, user: User) {
     entries = JSON.parse(json);
     if (!Array.isArray(entries)) throw new Error('Root must be an array.');
   } catch (e: any) {
-    await interaction.reply({ content: `Invalid JSON: ${e.message}`, flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Invalid JSON', `Invalid JSON: ${e.message}`)], flags: MessageFlags.Ephemeral });
     return;
   }
   const result = importTags(guild.id, entries, user.id);
@@ -326,7 +326,7 @@ async function tagAutocomplete(interaction: AutocompleteInteraction) {
 
 async function tagCommand(interaction: ChatInputCommandInteraction) {
   if (!interaction.guild) {
-    await interaction.reply({ content: 'This command must be used in a server.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Guild Only', 'This command must be used in a server.')], flags: MessageFlags.Ephemeral });
     return;
   }
   const sub = interaction.options.getSubcommand();
@@ -335,7 +335,7 @@ async function tagCommand(interaction: ChatInputCommandInteraction) {
 
   const needsManage = ['create', 'edit', 'delete', 'import'];
   if (needsManage.includes(sub) && !interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageGuild)) {
-    await interaction.reply({ content: 'You need **Manage Server** permission.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Permission Denied', 'You need **Manage Server** permission.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -356,17 +356,17 @@ async function tagMessageFlow(message: Message, guild: Guild, user: User) {
   const parts = message.content.slice(1).trim().split(/\s+/);
   const sub = parts[1]?.toLowerCase();
   if (sub === 'create' || sub === 'edit' || sub === 'delete' || sub === 'import') {
-    await message.reply('Use the slash command `/tag ' + sub + '` to manage tags.');
+    await message.reply({ embeds: [embed('Slash Command', `Use the slash command \`/tag ${sub}\` to manage tags.`)] });
     return;
   }
   const tagName = sub;
   if (!tagName) {
-    await message.reply('Usage: `!tag <name>` — send a tag. See `/tag list` for available tags.');
+    await message.reply({ embeds: [embed('Usage', 'Usage: `!tag <name>` — send a tag. See `/tag list` for available tags.')] });
     return;
   }
   const tag = findTag(guild.id, tagName);
   if (!tag) {
-    await message.reply(`Tag **${tagName}** not found. Use \`/tag list\` to see available tags.`);
+    await message.reply({ embeds: [embed('Not Found', `Tag **${tagName}** not found. Use \`/tag list\` to see available tags.`)] });
     return;
   }
   incrementTagUses(guild.id, tag.name);

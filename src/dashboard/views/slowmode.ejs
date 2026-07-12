@@ -1,49 +1,58 @@
 <%- include('header', { title: 'Slowmode', active: 'slowmode' }) %>
   <div class="page-header">
-    <h1>Auto Slowmode Configuration</h1>
+    <div class="icon">&#9201;</div>
+    <h1>Auto Slowmode</h1>
   </div>
 
-  <div class="section">
-    <h2>Enabled Channels</h2>
-    <% if (enabledChannels.length === 0) { %>
-      <div class="empty"><p>No channels have auto slowmode enabled. Use <code>/slowmode</code> or <code>!slowmode on</code> in a channel to enable it.</p></div>
-    <% } else { %>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Channel ID</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% for (const chId of enabledChannels) { %>
-              <tr>
-                <td><code><%= chId %></code></td>
-                <td>
-                  <form method="POST" action="/slowmode/toggle" class="inline-form" onsubmit="return confirm('Disable slowmode for this channel?')">
-                    <input type="hidden" name="channelId" value="<%= chId %>">
-                    <input type="hidden" name="enabled" value="false">
-                    <button class="btn btn-danger btn-sm">Disable</button>
-                  </form>
-                </td>
-              </tr>
-            <% } %>
-          </tbody>
-        </table>
+  <div class="path">
+    <div class="top">
+      <div class="text">
+        <div class="name">Enabled Channels</div>
+        <div class="description"><%= enabledChannels.length %> channel(s) have auto slowmode enabled.</div>
+      </div>
+    </div>
+  </div>
+
+  <% if (enabledChannels.length > 0) { %>
+    <% for (const chId of enabledChannels) { %>
+      <div class="path">
+        <div class="top">
+          <div class="text">
+            <div class="name"><code style="font-size:13px;"><%= chId %></code></div>
+            <div class="description">Auto slowmode is active on this channel.</div>
+          </div>
+          <div class="right-side">
+            <form method="POST" action="/<%= guildId %>/slowmode/toggle" onsubmit="return confirm('Disable slowmode for this channel?')">
+              <input type="hidden" name="channelId" value="<%= chId %>">
+              <input type="hidden" name="enabled" value="false">
+              <button class="btn btn-danger btn-sm">Disable</button>
+            </form>
+          </div>
+        </div>
       </div>
     <% } %>
-  </div>
+  <% } else { %>
+    <div class="empty">
+      <div class="empty-icon">&#9201;</div>
+      <p>No channels have auto slowmode enabled.</p>
+    </div>
+  <% } %>
 
-  <div class="section">
-    <h2>Add Channel Manually</h2>
-    <form method="POST" action="/slowmode/toggle" style="display: flex; gap: 8px; align-items: flex-end;">
-      <div class="form-group" style="flex: 1;">
-        <label>Channel ID</label>
-        <input name="channelId" placeholder="e.g. 123456789012345678" required>
+  <div class="section-label">Add Channel</div>
+
+  <div class="path">
+    <div class="top">
+      <div class="text">
+        <div class="name">New Channel</div>
+        <div class="description">Enter a channel ID to enable auto slowmode.</div>
       </div>
-      <input type="hidden" name="enabled" value="true">
-      <button class="btn btn-primary">Enable</button>
-    </form>
+      <div class="right-side">
+        <form method="POST" action="/<%= guildId %>/slowmode/toggle" style="display:flex;gap:8px;align-items:center;">
+          <input name="channelId" placeholder="e.g. 123456789012345678" required style="width:200px;">
+          <input type="hidden" name="enabled" value="true">
+          <button class="btn btn-primary">Enable</button>
+        </form>
+      </div>
+    </div>
   </div>
 <%- include('footer') %>

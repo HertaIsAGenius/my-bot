@@ -1,33 +1,31 @@
 <%- include('header', { title: 'Todo List', active: 'todos' }) %>
   <div class="page-header">
+    <div class="icon">&#9744;</div>
     <h1>Todo List</h1>
   </div>
 
-  <div class="section">
-    <h2>Add New Item</h2>
-    <form method="POST" action="/todos/add" style="display: flex; gap: 8px; align-items: flex-end;">
-      <div class="form-group" style="flex: 1;">
-        <label>Guild ID</label>
-        <input name="guildId" placeholder="e.g. 123456789012345678" required>
+  <div class="path">
+    <div class="top">
+      <div class="text">
+        <div class="name">Add New Item</div>
+        <div class="description">Create a new todo item for this server.</div>
       </div>
-      <div class="form-group" style="flex: 2;">
-        <label>Text</label>
-        <input name="text" placeholder="What needs to be done?" required>
+      <div class="right-side">
+        <form method="POST" action="/<%= guildId %>/todos/add" style="display:flex;gap:8px;align-items:center;">
+          <input name="text" placeholder="What needs to be done?" required style="width:220px;">
+          <button class="btn btn-primary">Add</button>
+        </form>
       </div>
-      <button class="btn btn-primary">Add</button>
-    </form>
+    </div>
   </div>
 
-  <% if (guildIds.length === 0) { %>
-    <div class="empty"><p>No todo items found. Add one above.</p></div>
-  <% } %>
-
-  <% for (const guildId of guildIds) { %>
-    <% var items = todos[guildId]; %>
-    <div class="guild-block">
-      <h3>Guild: <%= guildId %></h3>
-      <div class="sub"><%= items.length %> item(s)</div>
-
+  <% if (items.length === 0) { %>
+    <div class="empty">
+      <div class="empty-icon">&#9744;</div>
+      <p>No todo items. Add one above.</p>
+    </div>
+  <% } else { %>
+    <div class="path" style="padding:0;">
       <div class="table-wrap">
         <table>
           <thead>
@@ -36,7 +34,6 @@
               <th>Text</th>
               <th>Author</th>
               <th>Created</th>
-              <th>Edited</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -46,19 +43,16 @@
                 <td>#<%= item.id %></td>
                 <td><%= item.text %></td>
                 <td><%= item.authorTag || item.authorId %></td>
-                <td><%= new Date(item.createdAt).toLocaleString() %></td>
-                <td><%= item.editedAt ? new Date(item.editedAt).toLocaleString() : '--' %></td>
+                <td style="white-space:nowrap;"><%= new Date(item.createdAt).toLocaleString() %></td>
                 <td>
-                  <form method="POST" action="/todos/edit" class="inline-form" style="display: inline-flex; gap: 4px;">
-                    <input type="hidden" name="guildId" value="<%= guildId %>">
+                  <form method="POST" action="/<%= guildId %>/todos/edit" style="display:inline-flex;gap:4px;">
                     <input type="hidden" name="id" value="<%= item.id %>">
-                    <input name="text" value="<%= item.text %>" style="width: 200px; display: inline;" required>
+                    <input name="text" value="<%= item.text %>" style="width:150px;" required>
                     <button class="btn btn-primary btn-sm">Edit</button>
                   </form>
-                  <form method="POST" action="/todos/remove" class="inline-form" style="display: inline;">
-                    <input type="hidden" name="guildId" value="<%= guildId %>">
+                  <form method="POST" action="/<%= guildId %>/todos/remove" style="display:inline;">
                     <input type="hidden" name="id" value="<%= item.id %>">
-                    <button class="btn btn-danger btn-sm" onclick="return confirm('Remove todo #<%= item.id %>?')">Remove</button>
+                    <button class="btn btn-danger btn-sm" onclick="return confirm('Remove?')">Remove</button>
                   </form>
                 </td>
               </tr>

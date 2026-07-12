@@ -54,10 +54,10 @@ async function addFlow(interaction: ChatInputCommandInteraction | Message, guild
     const prefixMsg = interaction;
     const dm = await user.createDM().catch(() => null);
     if (!dm) {
-      await prefixMsg.reply('Could not send a DM. Enable DMs from server members and try again.');
+      await prefixMsg.reply({ embeds: [embed('DM Failed', 'Could not send a DM. Enable DMs from server members and try again.')] });
       return;
     }
-    await prefixMsg.reply('Check your DMs to add a todo item.');
+    await prefixMsg.reply({ embeds: [embed('DM Sent', 'Check your DMs to add a todo item.')] });
     const trigger = await dm.send({
       embeds: [embed('Add Todo', 'Press the button below to open the todo form.')],
       components: [
@@ -173,7 +173,7 @@ async function editFlow(interaction: ChatInputCommandInteraction | Message, guil
       .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Todo Edited'))
       .addTextDisplayComponents(new TextDisplayBuilder().setContent(`**#${item.id}** updated to — ${item.text}`));
     try { await msg.edit({ components: [result] }); } catch {}
-    await modalSub.reply({ content: 'Done!', flags: MessageFlags.Ephemeral });
+    await modalSub.reply({ embeds: [embed('Done', 'Todo edited successfully.')], flags: MessageFlags.Ephemeral });
   } else {
     await modalSub.reply({ embeds: [embed('Todo Edited', `**#${item.id}** updated to — ${item.text}`)], flags: MessageFlags.Ephemeral });
     try { await msg.edit({ components: [] }); } catch {}
@@ -279,7 +279,7 @@ async function clearFlow(interaction: ChatInputCommandInteraction | Message, gui
 
 async function todolistCommand(interaction: ChatInputCommandInteraction) {
   if (!interaction.guild) {
-    await interaction.reply({ content: 'This command must be used in a server.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Guild Only', 'This command must be used in a server.')], flags: MessageFlags.Ephemeral });
     return;
   }
   const sub = interaction.options.getSubcommand();

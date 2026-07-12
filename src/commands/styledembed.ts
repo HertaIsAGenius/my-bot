@@ -7,14 +7,14 @@ import {
   StringSelectMenuOptionBuilder,
   MessageFlags
 } from 'discord.js';
-import { COLORS } from '../utils/embed';
+import { embed, COLORS } from '../utils/embed';
 
 async function styledEmbedCommand(interaction: ChatInputCommandInteraction) {
   const title = interaction.options.getString('title') || 'Styled Embed';
   const description = interaction.options.getString('description') || 'Select an option below.';
 
   if (!interaction.guild) {
-    await interaction.reply({ content: 'Must be used in a server.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Guild Only', 'Must be used in a server.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -42,9 +42,9 @@ async function styledEmbedCommand(interaction: ChatInputCommandInteraction) {
       flags: MessageFlags.IsComponentsV2
     });
 
-    await interaction.editReply({ content: 'Sent!' });
+    await interaction.editReply({ embeds: [embed('Sent', 'Styled embed sent.')] });
   } catch (e: any) {
-    await interaction.editReply({ content: `Error: ${e.message}` });
+    await interaction.editReply({ embeds: [embed('Error', `Error: ${e.message}`)] });
   }
 }
 

@@ -1,57 +1,51 @@
 <%- include('header', { title: 'Infractions', active: 'infractions' }) %>
   <div class="page-header">
+    <div class="icon">&#9888;</div>
     <h1>Infractions</h1>
   </div>
 
-  <% if (guilds.length === 0) { %>
-    <div class="empty"><p>No infraction data found.</p></div>
-  <% } %>
-
-  <% for (const guild of guilds) { %>
-    <div class="guild-block">
-      <h3>Guild: <%= guild.id %></h3>
-      <div class="sub"><%= guild.users.length %> user(s) with infractions</div>
-
-      <% if (guild.users.length === 0) { %>
-        <p style="color: var(--text2);">No infractions recorded for this guild.</p>
-      <% } else { %>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>User ID</th>
-                <th>Type</th>
-                <th>Reason</th>
-                <th>Moderator</th>
-                <th>Date</th>
-                <th>Duration</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% for (const user of guild.users) { %>
-                <% for (const inf of user.infractions) { %>
-                  <tr>
-                    <td><code><%= user.id %></code></td>
-                    <td><span class="badge <%= inf.type.toLowerCase() %>"><%= inf.type %></span></td>
-                    <td><%= inf.reason %></td>
-                    <td><%= inf.moderatorTag || inf.moderatorId %></td>
-                    <td><%= new Date(inf.timestamp).toLocaleString() %></td>
-                    <td><%= inf.durationMinutes ? inf.durationMinutes + ' min' : '--' %></td>
-                    <td>
-                      <form method="POST" action="/infractions/clear" class="inline-form" onsubmit="return confirm('Clear all infractions for this user?')">
-                        <input type="hidden" name="guildId" value="<%= guild.id %>">
-                        <input type="hidden" name="userId" value="<%= user.id %>">
-                        <button class="btn btn-danger btn-sm">Clear</button>
-                      </form>
-                    </td>
-                  </tr>
-                <% } %>
+  <% if (!locals.hasData) { %>
+    <div class="empty">
+      <div class="empty-icon">&#9888;</div>
+      <p>No infraction data found for this server.</p>
+    </div>
+  <% } else { %>
+    <div class="path" style="padding:0;">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>User ID</th>
+              <th>Type</th>
+              <th>Reason</th>
+              <th>Moderator</th>
+              <th>Date</th>
+              <th>Duration</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% for (const user of users) { %>
+              <% for (const inf of user.infractions) { %>
+                <tr>
+                  <td><code style="font-size:12px;opacity:.6;"><%= user.id %></code></td>
+                  <td><span class="badge <%= inf.type.toLowerCase() %>"><%= inf.type %></span></td>
+                  <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><%= inf.reason %></td>
+                  <td><%= inf.moderatorTag || inf.moderatorId %></td>
+                  <td style="white-space:nowrap;"><%= new Date(inf.timestamp).toLocaleString() %></td>
+                  <td><%= inf.durationMinutes ? inf.durationMinutes + ' min' : '--' %></td>
+                  <td>
+                    <form method="POST" action="/<%= guildId %>/infractions/clear" onsubmit="return confirm('Clear all infractions for this user?')">
+                      <input type="hidden" name="userId" value="<%= user.id %>">
+                      <button class="btn btn-danger btn-sm">Clear</button>
+                    </form>
+                  </td>
+                </tr>
               <% } %>
-            </tbody>
-          </table>
-        </div>
-      <% } %>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
     </div>
   <% } %>
 <%- include('footer') %>

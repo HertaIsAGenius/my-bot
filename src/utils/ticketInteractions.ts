@@ -16,6 +16,7 @@ import {
   NewsChannel,
   MessageFlags
 } from 'discord.js';
+import { embed } from './embed';
 import { getPingRole } from './ticketConfig';
 import { createTicket } from './tickets';
 const ticketMessageCreateCmd = require('../commands/ticketmessagecreate');
@@ -64,9 +65,9 @@ export async function handleTicketPanelJsonModal(interaction: ModalSubmitInterac
     const channel = interaction.channel as TextChannel;
     await channel.bulkDelete(100).catch(() => {});
     await channel.send({ components: [container], flags: MessageFlags.IsComponentsV2 });
-    await interaction.editReply({ content: 'Ticket panel sent.' });
+    await interaction.editReply({ embeds: [embed('Panel Sent', 'Ticket panel sent.')] });
   } catch (e: any) {
-    await interaction.editReply({ content: `Failed: ${e.message}` });
+    await interaction.editReply({ embeds: [embed('Failed', `Failed: ${e.message}`)] });
   }
 }
 
@@ -107,7 +108,7 @@ export async function handleTicketReasonModal(interaction: ModalSubmitInteractio
   const reason = interaction.fields.getTextInputValue('ticket_reason');
   const guild = interaction.guild;
   if (!guild) {
-    await interaction.reply({ content: 'This must be used in a server.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Guild Only', 'This must be used in a server.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -125,7 +126,7 @@ export async function handleTicketReasonModal(interaction: ModalSubmitInteractio
       : null;
     const channel = (targetChannel ?? interaction.channel) as TextChannel | NewsChannel;
     if (!channel || !('threads' in channel)) {
-      await interaction.editReply({ content: 'Invalid channel.' });
+      await interaction.editReply({ embeds: [embed('Invalid Channel', 'Invalid channel.')] });
       return;
     }
 
@@ -196,8 +197,8 @@ export async function handleTicketReasonModal(interaction: ModalSubmitInteractio
 
     const catMap: Record<string, string> = { inquiry: 'support', report: 'bug', staffreport: 'staff', hsr: 'other' };
     const ticket = createTicket(guild.id, thread.id, interaction.user.id, interaction.user.tag, catMap[category] as any, reason);
-    await interaction.editReply({ content: `Ticket #${ticket.id} created: ${thread}` });
+    await interaction.editReply({ embeds: [embed('Ticket Created', `Ticket #${ticket.id} created: ${thread}`)] });
   } catch (e: any) {
-    await interaction.editReply({ content: `Failed to create ticket thread: ${e.message}` });
+    await interaction.editReply({ embeds: [embed('Failed', `Failed to create ticket thread: ${e.message}`)] });
   }
 }

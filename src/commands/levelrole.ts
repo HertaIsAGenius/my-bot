@@ -4,12 +4,12 @@ import { getLevelRole, setLevelRole, removeLevelRole, listLevelRoles } from '../
 
 async function levelroleCommand(interaction: ChatInputCommandInteraction) {
   if (!interaction.guild) {
-    await interaction.reply({ content: 'This command must be used in a server.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Guild Only', 'This command must be used in a server.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
   if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageGuild)) {
-    await interaction.reply({ content: 'You need Manage Server permission.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Permission Denied', 'You need Manage Server permission.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -21,7 +21,7 @@ async function levelroleCommand(interaction: ChatInputCommandInteraction) {
     const role = interaction.options.getRole('role', true);
 
     if (level < 1) {
-      await interaction.reply({ content: 'Level must be 1 or higher.', flags: MessageFlags.Ephemeral });
+      await interaction.reply({ embeds: [embed('Invalid Level', 'Level must be 1 or higher.')], flags: MessageFlags.Ephemeral });
       return;
     }
 
@@ -37,7 +37,7 @@ async function levelroleCommand(interaction: ChatInputCommandInteraction) {
     const level = interaction.options.getInteger('level', true);
     const removed = removeLevelRole(guildId, level);
     if (!removed) {
-      await interaction.reply({ content: `No role is configured for level ${level}.`, flags: MessageFlags.Ephemeral });
+      await interaction.reply({ embeds: [embed('Not Found', `No role is configured for level ${level}.`)], flags: MessageFlags.Ephemeral });
       return;
     }
     await interaction.reply({

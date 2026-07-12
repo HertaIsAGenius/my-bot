@@ -1,9 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { dataPath } from './dataPath';
-
-const dataDir = dataPath();
-const tagsPath = join(dataDir, 'tags.json');
+import { getTags as dbGetTags, getTag as dbGetTag, createTag as dbCreate, editTag as dbEdit, deleteTag as dbDelete, incrementTagUses as dbIncUses } from './db';
 
 export interface StaffTag {
   id: number;
@@ -21,33 +16,22 @@ export interface StaffTag {
   updatedAt?: number;
 }
 
-let cache: Record<string, StaffTag[]> | null = null;
-
-function ensureDataDir() {
-  if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true });
-}
-
-function loadAll(): Record<string, StaffTag[]> {
-  if (cache) return cache;
-  ensureDataDir();
-  if (!existsSync(tagsPath)) {
-    writeFileSync(tagsPath, JSON.stringify({}), 'utf-8');
-    cache = {};
-    return cache;
-  }
-  try {
-    cache = JSON.parse(readFileSync(tagsPath, 'utf-8')) as Record<string, StaffTag[]>;
-  } catch {
-    writeFileSync(tagsPath, JSON.stringify({}), 'utf-8');
-    cache = {};
-  }
-  return cache;
-}
-
-function saveAll(data: Record<string, StaffTag[]>) {
-  cache = data;
-  ensureDataDir();
-  writeFileSync(tagsPath, JSON.stringify(data, null, 2), 'utf-8');
+function mapRow(r: any): StaffTag {
+  return {
+    id: r.id,
+    guildId: r.guild_id,
+    name: r.name,
+    aliases: JSON.parse(r.aliases || '[]'),
+    title: r.title || '',
+    content: r.content,
+    footer: r.footer || undefined,
+    imageUrl: r.image_url || undefined,
+    createdBy: r.created_by,
+    updatedBy: r.updated_by || undefined,
+    uses: r.uses || 0,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at || undefined,
+  };
 }
 
 function normalizeName(name: string) {
@@ -55,83 +39,50 @@ function normalizeName(name: string) {
 }
 
 export function createTag(guildId: string, name: string, content: string, authorId: string, opts?: { aliases?: string[]; title?: string; footer?: string; imageUrl?: string }) {
-  const data = loadAll();
-  const list = data[guildId] ?? [];
   const n = normalizeName(name);
   if (!n) throw new Error('Tag name cannot be empty after normalization.');
-  if (list.some((t) => t.name === n)) throw new Error(`Tag "${n}" already exists.`);
-  const id = list.length > 0 ? list[list.length - 1].id + 1 : 1;
-  const cleanAliases = (opts?.aliases ?? []).map(normalizeName).filter(Boolean);
-  const tag: StaffTag = {
-    id, guildId, name: n, aliases: cleanAliases, title: opts?.title ?? '', content,
-    footer: opts?.footer, imageUrl: opts?.imageUrl, createdBy: authorId,
-    uses: 0, createdAt: Date.now()
-  };
-  list.push(tag);
-  data[guildId] = list;
-  saveAll(data);
-  return tag;
+  try {
+    const result = dbCreate(guildId, n, content, authorId, opts);
+    return mapRow(result);
+  } catch (e: any) {
+    if (e.message?.includes('already exists')) throw e;
+    throw e;
+  }
 }
 
-export function getTags(guildId: string) {
-  return loadAll()[guildId] ?? [];
+export function getTags(guildId: string): StaffTag[] {
+  return (dbGetTags(guildId) as any[]).map(mapRow);
 }
 
 export function getTag(guildId: string, name: string): StaffTag | null {
   const n = normalizeName(name);
-  return getTags(guildId).find(t => t.name === n) ?? null;
+  const row = dbGetTag(guildId, n);
+  return row ? mapRow(row) : null;
 }
 
-export function findTag(guildId: string, nameOrAlias: string) {
+export function findTag(guildId: string, nameOrAlias: string): StaffTag | null {
   const n = normalizeName(nameOrAlias);
-  const tags = getTags(guildId);
-  return tags.find((t) => t.name === n || t.aliases.includes(n)) ?? null;
+  const tags = dbGetTags(guildId) as any[];
+  const found = tags.find((t: any) => t.name === n || (JSON.parse(t.aliases || '[]') as string[]).includes(n));
+  return found ? mapRow(found) : null;
 }
 
 export function editTag(guildId: string, currentName: string, updates: { name?: string; content?: string; aliases?: string[]; title?: string; footer?: string; imageUrl?: string }, editorId: string) {
-  const data = loadAll();
-  const list = data[guildId] ?? [];
-  const idx = list.findIndex((t) => t.name === normalizeName(currentName));
-  if (idx === -1) return null;
-  const tag = list[idx];
-  if (updates.name !== undefined) {
-    const newName = normalizeName(updates.name);
-    if (newName && newName !== tag.name && list.some((t, i) => i !== idx && t.name === newName)) {
-      throw new Error(`Tag "${newName}" already exists.`);
-    }
-    if (newName) tag.name = newName;
-  }
-  if (updates.content !== undefined) tag.content = updates.content;
-  if (updates.aliases !== undefined) tag.aliases = updates.aliases.map(normalizeName).filter(Boolean);
-  if (updates.title !== undefined) tag.title = updates.title;
-  if (updates.footer !== undefined) tag.footer = updates.footer || undefined;
-  if (updates.imageUrl !== undefined) tag.imageUrl = updates.imageUrl || undefined;
-  tag.updatedBy = editorId;
-  tag.updatedAt = Date.now();
-  data[guildId] = list;
-  saveAll(data);
-  return tag;
+  const n = normalizeName(currentName);
+  const result = dbEdit(guildId, n, updates, editorId);
+  if (!result) return null;
+  return mapRow(result);
 }
 
 export function deleteTag(guildId: string, name: string) {
-  const data = loadAll();
-  const list = data[guildId] ?? [];
   const n = normalizeName(name);
-  const idx = list.findIndex((t) => t.name === n);
-  if (idx === -1) return null;
-  const [removed] = list.splice(idx, 1);
-  data[guildId] = list;
-  saveAll(data);
-  return removed;
+  const result = dbDelete(guildId, n);
+  return result ? mapRow(result) : null;
 }
 
 export function incrementTagUses(guildId: string, name: string) {
-  const data = loadAll();
-  const list = data[guildId] ?? [];
-  const tag = list.find((t) => t.name === normalizeName(name));
-  if (!tag) return;
-  tag.uses++;
-  saveAll(data);
+  const n = normalizeName(name);
+  dbIncUses(guildId, n);
 }
 
 export interface TagExportEntry {
@@ -155,32 +106,34 @@ export function exportTags(guildId: string): TagExportEntry[] {
 }
 
 export function importTags(guildId: string, entries: TagExportEntry[], userId: string): { imported: number; skipped: string[] } {
-  const data = loadAll();
-  const list = data[guildId] ?? [];
   const skipped: string[] = [];
-
+  let imported = 0;
   for (const entry of entries) {
     const n = normalizeName(entry.name);
     if (!n) { skipped.push(entry.name); continue; }
-    const existing = list.findIndex(t => t.name === n);
-    const id = list.length > 0 ? Math.max(...list.map(t => t.id)) + 1 : 1;
-
-    const cleanAliases = (entry.aliases ?? []).map(normalizeName).filter(Boolean);
-    const tag: StaffTag = {
-      id, guildId, name: n, aliases: cleanAliases, title: entry.title,
-      content: entry.description ?? '',
-      footer: entry.footer, imageUrl: entry.imageUrl,
-      createdBy: userId, uses: 0, createdAt: Date.now()
-    };
-
-    if (existing >= 0) {
-      list[existing] = { ...list[existing], ...tag, id: list[existing].id, uses: list[existing].uses, createdAt: list[existing].createdAt, updatedBy: userId, updatedAt: Date.now() };
-    } else {
-      list.push(tag);
+    try {
+      const existing = getTag(guildId, n);
+      if (existing) {
+        editTag(guildId, n, {
+          name: n,
+          title: entry.title,
+          content: entry.description ?? '',
+          aliases: entry.aliases,
+          footer: entry.footer,
+          imageUrl: entry.imageUrl,
+        }, userId);
+      } else {
+        createTag(guildId, n, entry.description ?? '', userId, {
+          title: entry.title,
+          aliases: entry.aliases,
+          footer: entry.footer,
+          imageUrl: entry.imageUrl,
+        });
+      }
+      imported++;
+    } catch {
+      skipped.push(entry.name);
     }
   }
-
-  data[guildId] = list;
-  saveAll(data);
-  return { imported: entries.length - skipped.length, skipped };
+  return { imported, skipped };
 }

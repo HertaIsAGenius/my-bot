@@ -1,13 +1,14 @@
 import { ChatInputCommandInteraction, EmbedBuilder, PermissionsBitField, MessageFlags } from 'discord.js';
+import { embed, COLORS } from '../utils/embed';
 import { addXpDirect } from '../utils/levels';
 
 async function addxpCommand(interaction: ChatInputCommandInteraction) {
   if (!interaction.guild) {
-    await interaction.reply({ content: 'This command must be used in a server.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Guild Only', 'This command must be used in a server.')], flags: MessageFlags.Ephemeral });
     return;
   }
   if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageGuild)) {
-    await interaction.reply({ content: 'You need **Manage Server** permission to add XP.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Permission Denied', 'You need **Manage Server** permission to add XP.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -15,7 +16,7 @@ async function addxpCommand(interaction: ChatInputCommandInteraction) {
   const amount = interaction.options.getInteger('amount', true);
 
   if (amount < 1) {
-    await interaction.reply({ content: 'Amount must be at least 1.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Invalid Amount', 'Amount must be at least 1.')], flags: MessageFlags.Ephemeral });
     return;
   }
 

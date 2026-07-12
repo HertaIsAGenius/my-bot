@@ -1,35 +1,44 @@
-import { ChatInputCommandInteraction, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } from 'discord.js';
-import { getTrialAppChannel, getForms, getForm } from '../utils/trialapps';
+import { ChatInputCommandInteraction, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags, ContainerBuilder, SeparatorBuilder, SeparatorSpacingSize, TextDisplayBuilder } from 'discord.js';
+import { COLORS } from '../utils/embed';
+import { getTrialAppChannel, getForms } from '../utils/trialapps';
 
-const guildId = process.env.GUILD_ID || '';
-
-const appStates = new Map<string, {
+type AppState = {
+  guildId: string;
   formName: string;
   questions: string[];
   answers: string[];
   currentQ: number;
-}>();
+};
 
-export default async function trialappstartCommand(interaction: ChatInputCommandInteraction) {
-  if (interaction.guild) {
-    await interaction.reply({ content: 'Please run this command in my DMs to start an application.', flags: MessageFlags.Ephemeral });
-    return;
-  }
+const appStates = new Map<string, AppState>();
 
+function makeContainer(title: string, body: string, accent?: number) {
+  return new ContainerBuilder()
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# **${title}**`))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(body))
+    .setAccentColor(accent ?? COLORS.accent);
+}
+
+async function sendFormSelector(target: any, guildId: string, isUpdate: boolean) {
   const channelId = getTrialAppChannel(guildId);
   if (!channelId) {
-    await interaction.reply({ content: 'This server has not set up an application channel yet. Please try again later.', flags: MessageFlags.Ephemeral });
+    const c = makeContainer('Not Configured', 'This server has not set up an application channel yet. Please try again later.');
+    if (isUpdate) await target.message.edit({ components: [c], flags: MessageFlags.IsComponentsV2 });
+    else await target.reply({ components: [c], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
     return;
   }
 
   const forms = getForms(guildId);
   if (forms.length === 0) {
-    await interaction.reply({ content: 'No application forms are available right now. Please try again later.', flags: MessageFlags.Ephemeral });
+    const c = makeContainer('No Forms', 'No application forms are available right now. Please try again later.');
+    if (isUpdate) await target.message.edit({ components: [c], flags: MessageFlags.IsComponentsV2 });
+    else await target.reply({ components: [c], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
     return;
   }
 
-  const options = forms.map(f =>
-    new StringSelectMenuOptionBuilder().setLabel(f.name).setDescription(`${f.questions.length} question(s)`).setValue(f.name)
+  const options = forms.map((f, i) =>
+    new StringSelectMenuOptionBuilder().setLabel(f.name).setDescription(`${f.questions.length} question(s)`).setValue(`${guildId}:${i}`)
   );
 
   const select = new StringSelectMenuBuilder()
@@ -39,36 +48,121 @@ export default async function trialappstartCommand(interaction: ChatInputCommand
 
   const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
 
-  const embed = new EmbedBuilder()
-    .setColor(0x2B3A67)
-    .setTitle('Start an Application')
-    .setDescription('Select the type of application you want to submit.');
+  const container = new ContainerBuilder()
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent('# **Start an Application**'))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent('Select the type of application you want to submit.'))
+    .addActionRowComponents(row)
+    .setAccentColor(COLORS.accent);
 
-  await interaction.reply({ embeds: [embed], components: [row] });
+  if (isUpdate) {
+    await target.message.edit({ components: [container], flags: MessageFlags.IsComponentsV2 });
+  } else {
+    await target.reply({ components: [container], flags: MessageFlags.IsComponentsV2 });
+  }
+}
+
+export default async function trialappstartCommand(interaction: ChatInputCommandInteraction) {
+  if (interaction.guild) {
+    const c = makeContainer('DM Only', 'Please run this command in my DMs to start an application.');
+    await interaction.reply({ components: [c], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
+    return;
+  }
+
+  const guilds = interaction.client.guilds.cache;
+
+  if (guilds.size === 0) {
+    const c = makeContainer('No Servers', 'The bot is not in any server.');
+    await interaction.reply({ components: [c], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
+    return;
+  }
+
+  if (guilds.size === 1) {
+    await sendFormSelector(interaction, guilds.first()!.id, false);
+    return;
+  }
+
+  const options = guilds.map(g =>
+    new StringSelectMenuOptionBuilder().setLabel(g.name).setValue(g.id)
+  );
+
+  const select = new StringSelectMenuBuilder()
+    .setCustomId('trialapp_guild_sel')
+    .setPlaceholder('Select a server...')
+    .addOptions(options);
+
+  const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
+
+  const container = new ContainerBuilder()
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent('# **Select a Server**'))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent('Which server would you like to apply to?'))
+    .addActionRowComponents(row)
+    .setAccentColor(COLORS.accent);
+
+  await interaction.reply({ components: [container], flags: MessageFlags.IsComponentsV2 });
+}
+
+export async function handleGuildSelect(interaction: any) {
+  await interaction.deferUpdate();
+  await sendFormSelector(interaction, interaction.values[0], true);
 }
 
 export async function handleFormSelect(interaction: any) {
-  const formName = interaction.values[0];
-  const form = getForm(guildId, formName);
+  const raw = interaction.values[0];
+  const [guildId, formIndexStr] = raw.split(':');
+  const formIndex = parseInt(formIndexStr);
+  const forms = getForms(guildId);
+  const form = forms[formIndex];
   if (!form) {
-    await interaction.reply({ content: 'That form no longer exists.', flags: MessageFlags.Ephemeral });
+    const c = makeContainer('Not Found', 'That form no longer exists.');
+    await interaction.reply({ components: [c], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
     return;
   }
 
   appStates.set(interaction.user.id, {
-    formName,
+    guildId,
+    formName: form.name,
     questions: form.questions,
     answers: [],
     currentQ: 0
   });
 
-  const q = form.questions[0];
-  const embed = new EmbedBuilder()
-    .setColor(0x2B3A67)
-    .setTitle(`Application: ${formName}`)
-    .setDescription(`**Question 1/${form.questions.length}**\n\n${q}\n\nType your answer in this DM.`);
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId('trialapp_form_start').setLabel('Start').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('trialapp_form_stop').setLabel('Stop').setStyle(ButtonStyle.Danger),
+  );
 
-  await interaction.update({ embeds: [embed], components: [] });
+  const container = new ContainerBuilder()
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# **${form.name}**`))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent('Press **Start** to begin your application or **Stop** to cancel.'))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large))
+    .addActionRowComponents(row)
+    .setAccentColor(COLORS.accent);
+
+  await interaction.deferUpdate();
+  await interaction.message.edit({ components: [container], flags: MessageFlags.IsComponentsV2 });
+}
+
+export async function handleFormStart(interaction: any) {
+  const state = appStates.get(interaction.user.id);
+  if (!state) {
+    const c = makeContainer('Not Found', 'No pending application found.');
+    await interaction.deferUpdate();
+    await interaction.message.edit({ components: [c], flags: MessageFlags.IsComponentsV2 });
+    return;
+  }
+
+  const q = state.questions[0];
+  const container = new ContainerBuilder()
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# **Application: ${state.formName}**`))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Question 1/${state.questions.length}**\n\n${q}\n\nType your answer in this DM.`))
+    .setAccentColor(COLORS.accent);
+
+  await interaction.deferUpdate();
+  await interaction.message.edit({ components: [container], flags: MessageFlags.IsComponentsV2 });
 }
 
 export async function handleDmMessage(message: any): Promise<boolean> {
@@ -79,7 +173,10 @@ export async function handleDmMessage(message: any): Promise<boolean> {
 
   const answer = message.content.trim();
   if (!answer) {
-    try { await message.reply('Please provide an answer.'); } catch {}
+    try {
+      const c = makeContainer('No Answer', 'Please provide an answer.');
+      await message.reply({ components: [c], flags: MessageFlags.IsComponentsV2 });
+    } catch {}
     return true;
   }
 
@@ -89,25 +186,31 @@ export async function handleDmMessage(message: any): Promise<boolean> {
   try {
     if (state.currentQ >= state.questions.length) {
       const lines = state.questions.map((q, i) => `**${q}**\n${state.answers[i]}`).join('\n\n');
-      await message.reply('Answer recorded! Review your application below.');
-      const embed = new EmbedBuilder()
-        .setColor(0x2B3A67)
-        .setTitle(`Review Your ${state.formName} Application`)
-        .setDescription(lines);
+      const c = makeContainer('Answer Recorded', 'Answer recorded! Review your application below.');
+      await message.reply({ components: [c], flags: MessageFlags.IsComponentsV2 });
 
       const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder().setCustomId('trialapp_accept').setLabel('Accept').setStyle(ButtonStyle.Success),
         new ButtonBuilder().setCustomId('trialapp_cancel').setLabel('Cancel form').setStyle(ButtonStyle.Danger),
       );
 
-      await message.channel.send({ embeds: [embed], components: [row] });
+      const container = new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# **Review Your ${state.formName} Application**`))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines))
+        .addActionRowComponents(row)
+        .setAccentColor(COLORS.accent);
+
+      await message.channel.send({ components: [container], flags: MessageFlags.IsComponentsV2 });
     } else {
       const q = state.questions[state.currentQ];
-      const embed = new EmbedBuilder()
-        .setColor(0x2B3A67)
-        .setTitle(`Application: ${state.formName}`)
-        .setDescription(`**Question ${state.currentQ + 1}/${state.questions.length}**\n\n${q}\n\nType your answer in this DM.`);
-      await message.channel.send({ embeds: [embed] });
+      const container = new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# **Application: ${state.formName}**`))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Question ${state.currentQ + 1}/${state.questions.length}**\n\n${q}\n\nType your answer in this DM.`))
+        .setAccentColor(COLORS.accent);
+
+      await message.channel.send({ components: [container], flags: MessageFlags.IsComponentsV2 });
     }
   } catch (e) {
     console.error('TrialApp DM error:', e);
@@ -119,13 +222,16 @@ export async function handleDmMessage(message: any): Promise<boolean> {
 export async function handleAccept(interaction: any) {
   const state = appStates.get(interaction.user.id);
   if (!state) {
-    await interaction.reply({ content: 'No pending application found.', flags: MessageFlags.Ephemeral });
+    const c = makeContainer('Not Found', 'No pending application found.');
+    await interaction.reply({ components: [c], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
     return;
   }
 
+  const guildId = state.guildId;
   const channelId = getTrialAppChannel(guildId);
   if (!channelId) {
-    await interaction.reply({ content: 'Application channel is no longer configured.', flags: MessageFlags.Ephemeral });
+    const c = makeContainer('Not Configured', 'Application channel is no longer configured.');
+    await interaction.reply({ components: [c], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
     return;
   }
 
@@ -134,13 +240,15 @@ export async function handleAccept(interaction: any) {
   try {
     const guild = interaction.client.guilds.cache.get(guildId);
     if (!guild) {
-      await interaction.editReply({ content: 'Could not find the server.' });
+      const c = makeContainer('Not Found', 'Could not find the server.');
+      await interaction.editReply({ components: [c], flags: MessageFlags.IsComponentsV2 });
       return;
     }
 
     const channel = (guild.channels.cache.get(channelId) ?? await guild.channels.fetch(channelId).catch(() => null)) as any;
     if (!channel?.isTextBased()) {
-      await interaction.editReply({ content: 'Application channel is invalid.' });
+      const c = makeContainer('Invalid Channel', 'Application channel is invalid.');
+      await interaction.editReply({ components: [c], flags: MessageFlags.IsComponentsV2 });
       return;
     }
 
@@ -160,69 +268,77 @@ export async function handleAccept(interaction: any) {
     const globalAvatar = user.displayAvatarURL({ size: 1024 });
     const serverAvatar = member.displayAvatarURL({ size: 1024 });
 
-    const embed = new EmbedBuilder()
-      .setColor(color)
-      .setTitle(`${user.username}'s ${state.formName}`)
-      .setThumbnail(globalAvatar)
-      .addFields(
-        {
-          name: 'User',
-          value: [
-            `User: @${user.username}`,
-            `ID: ${user.id}`,
-            `Mention: <@${user.id}>`,
-            `Created: <t:${Math.floor(user.createdAt.getTime() / 1000)}:R>`,
-            `Banner color: ${bannerColor}`,
-            `Avatar: [global](${globalAvatar}) / [server](${serverAvatar})`,
-          ].join('\n'),
-        },
-        {
-          name: 'Server',
-          value: `Joined: <t:${Math.floor(member.joinedAt.getTime() / 1000)}:R>`,
-        },
-      );
+    const encodedForm = state.formName.replace(/:/g, '-');
+    const acceptId = `tapp_acc_${user.id}:${encodedForm}`;
+    const denyId = `tapp_den_${user.id}:${encodedForm}`;
+
+    const userText = [
+      `**User:** @${user.username}`,
+      `**ID:** ${user.id}`,
+      `**Mention:** <@${user.id}>`,
+      `**Created:** <t:${Math.floor(user.createdAt.getTime() / 1000)}:R>`,
+      `**Banner color:** ${bannerColor}`,
+      `**Avatar:** [global](${globalAvatar}) / [server](${serverAvatar})`,
+    ].join('\n');
+
+    const container = new ContainerBuilder()
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# **${user.username}'s ${state.formName}**`))
+      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large))
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(`**User**\n${userText}`))
+      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large))
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Server**\nJoined: <t:${Math.floor(member.joinedAt.getTime() / 1000)}:R>`))
+      .setAccentColor(color);
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId(acceptId).setLabel('Accept').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(denyId).setLabel('Deny').setStyle(ButtonStyle.Danger),
+    );
+
+    const msg = await channel.send({ components: [container, row], flags: MessageFlags.IsComponentsV2 });
+    const thread = await msg.startThread({ name: threadName });
 
     const lines = state.questions
       .map((q, i) => `> ${i + 1}. ${q}\n> ${state.answers[i] || '*no response*'}`)
       .join('\n\n');
 
-    const answersEmbed = new EmbedBuilder()
-      .setColor(color)
-      .setTitle('Application Answers')
-      .setDescription(lines);
+    const answersContainer = new ContainerBuilder()
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent('# **Application Answers**'))
+      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large))
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines))
+      .setAccentColor(color);
 
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId('trialapp_channel_accept').setLabel('Accept').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId('trialapp_channel_deny').setLabel('Deny').setStyle(ButtonStyle.Danger),
-    );
-
-    const message = await channel.send({ embeds: [embed], components: [row] });
-    const thread = await message.startThread({ name: threadName });
-    await thread.send({ embeds: [answersEmbed] });
+    await thread.send({ components: [answersContainer], flags: MessageFlags.IsComponentsV2 });
 
     appStates.delete(interaction.user.id);
-    await interaction.editReply({ content: `Your application has been submitted!` });
+    const c = makeContainer('Submitted', 'Your application has been submitted!');
+    await interaction.editReply({ components: [c], flags: MessageFlags.IsComponentsV2 });
   } catch (e: any) {
-    await interaction.editReply({ content: `Failed to submit application: ${e.message}` });
+    const c = makeContainer('Failed', `Failed to submit application: ${e.message}`);
+    await interaction.editReply({ components: [c], flags: MessageFlags.IsComponentsV2 });
   }
 }
 
 export async function handleCancel(interaction: any) {
   appStates.delete(interaction.user.id);
-  const embed = new EmbedBuilder()
-    .setColor(0x2B3A67)
-    .setTitle('Application Cancelled')
-    .setDescription('Your application has been cancelled. No information was saved.');
-  await interaction.update({ embeds: [embed], components: [] });
+  const container = new ContainerBuilder()
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent('# **Application Cancelled**'))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent('Your application has been cancelled. No information was saved.'))
+    .setAccentColor(COLORS.accent);
+
+  await interaction.deferUpdate();
+  await interaction.message.edit({ components: [container], flags: MessageFlags.IsComponentsV2 });
 }
 
 export async function handleChannelDecision(interaction: any) {
-  const isAccept = interaction.customId === 'trialapp_channel_accept';
-  const formName = interaction.message.embeds[0]?.title?.replace(/^[^']+'s /, '') || 'application';
-
-  const mentionField = interaction.message.embeds[0]?.fields?.find((f: any) => f.name === 'User')?.value || '';
-  const mentionMatch = mentionField.match(/<@(\d+)>/);
-  const userId = mentionMatch ? mentionMatch[1] : null;
+  const customId = interaction.customId;
+  const isAccept = customId.startsWith('tapp_acc_');
+  const payload = customId.startsWith('tapp_acc_')
+    ? customId.slice('tapp_acc_'.length)
+    : customId.slice('tapp_den_'.length);
+  const colonIdx = payload.indexOf(':');
+  const userId = colonIdx >= 0 ? payload.slice(0, colonIdx) : payload;
+  const formName = colonIdx >= 0 ? payload.slice(colonIdx + 1) : 'application';
 
   if (userId) {
     try {
@@ -231,13 +347,19 @@ export async function handleChannelDecision(interaction: any) {
     } catch {}
   }
 
+  const topRow = interaction.message.components?.[0];
+  const acceptBtn = topRow?.components?.find((c: any) => c.customId?.startsWith('tapp_acc_'));
+  const denyBtn = topRow?.components?.find((c: any) => c.customId?.startsWith('tapp_den_'));
+
   const disabledRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId('trialapp_channel_accept').setLabel('Accept').setStyle(ButtonStyle.Success).setDisabled(true),
-    new ButtonBuilder().setCustomId('trialapp_channel_deny').setLabel('Deny').setStyle(ButtonStyle.Danger).setDisabled(true),
+    new ButtonBuilder().setCustomId(acceptBtn?.customId || 'tapp_acc_unknown').setLabel('Accept').setStyle(ButtonStyle.Success).setDisabled(true),
+    new ButtonBuilder().setCustomId(denyBtn?.customId || 'tapp_den_unknown').setLabel('Deny').setStyle(ButtonStyle.Danger).setDisabled(true),
   );
 
   await interaction.message.edit({ components: [disabledRow] });
-  await interaction.reply({ content: `Application ${isAccept ? 'accepted' : 'denied'} successfully.`, flags: MessageFlags.Ephemeral });
+
+  const c = makeContainer('Decision Recorded', `Application ${isAccept ? 'accepted' : 'denied'} successfully.`);
+  await interaction.reply({ components: [c], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
 }
 
-module.exports = { default: trialappstartCommand, handleFormSelect, handleDmMessage, handleAccept, handleCancel, handleChannelDecision, appStates };
+module.exports = { default: trialappstartCommand, handleGuildSelect, handleFormSelect, handleFormStart, handleDmMessage, handleAccept, handleCancel, handleChannelDecision, appStates };

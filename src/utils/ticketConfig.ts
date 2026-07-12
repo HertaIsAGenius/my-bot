@@ -1,6 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { dataPath } from './dataPath';
+import { getTicketConfig as dbGet, setTicketConfig as dbSet, setPingRole as dbSetPing, getPingRole as dbGetPing } from './db';
 
 export const TICKET_CATEGORIES = ['support', 'bug', 'purchase', 'staff', 'other'] as const;
 export type TicketCategory = typeof TICKET_CATEGORIES[number];
@@ -40,59 +38,18 @@ export interface TicketGuildConfig {
   pingRoles: Partial<Record<ThreadCategory, string>>;
 }
 
-const defaults: TicketGuildConfig = {
-  ticketCategoryId: null,
-  loggingChannelId: null,
-  panelChannelId: null,
-  panelMessageId: null,
-  supportRoleIds: [],
-  pingRoles: {}
-};
-
-const CONFIG_PATH = dataPath('ticketConfig.json');
-
-let cache: Record<string, TicketGuildConfig> | null = null;
-
-function load(): Record<string, TicketGuildConfig> {
-  if (cache) return cache;
-  try {
-    if (existsSync(CONFIG_PATH)) {
-      cache = JSON.parse(readFileSync(CONFIG_PATH, 'utf-8'));
-    }
-  } catch {}
-  cache = cache || {};
-  return cache;
-}
-
-function save() {
-  const dir = dataPath();
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(CONFIG_PATH, JSON.stringify(cache || {}, null, 2));
-}
-
 export function getTicketConfig(guildId: string): TicketGuildConfig {
-  const all = load();
-  return { ...defaults, ...(all[guildId] || {}) };
+  return dbGet(guildId) as TicketGuildConfig;
 }
 
 export function setTicketConfig(guildId: string, config: Partial<TicketGuildConfig>) {
-  const all = load();
-  all[guildId] = { ...getTicketConfig(guildId), ...config };
-  save();
+  dbSet(guildId, config);
 }
 
 export function setPingRole(guildId: string, category: ThreadCategory, roleId: string | null) {
-  const cfg = getTicketConfig(guildId);
-  const pingRoles = { ...cfg.pingRoles };
-  if (roleId) {
-    pingRoles[category] = roleId;
-  } else {
-    delete pingRoles[category];
-  }
-  setTicketConfig(guildId, { pingRoles });
+  dbSetPing(guildId, category, roleId);
 }
 
 export function getPingRole(guildId: string, category: string): string | null {
-  const cfg = getTicketConfig(guildId);
-  return cfg.pingRoles[category as ThreadCategory] || null;
+  return dbGetPing(guildId, category);
 }

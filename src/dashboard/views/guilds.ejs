@@ -1,0 +1,20 @@
+<%- include('header', { title: 'Select Server', active: '' }) %>
+  <div class="guild-picker">
+    <h1>Select a server</h1>
+    <div class="sub">Choose a server to manage its settings</div>
+    <div class="guild-grid">
+      <% for (const g of guilds) { %>
+        <a href="/<%= g.id %>/home" class="guild-card">
+          <div class="g-icon">
+            <% if (g.icon) { %>
+              <img src="https://cdn.discordapp.com/icons/<%= g.id %>/<%= g.icon %>.png" alt="">
+            <% } else { %>
+              <%= g.name.charAt(0).toUpperCase() %>
+            <% } %>
+          </div>
+          <div class="g-name"><%= g.name %></div>
+        </a>
+      <% } %>
+    </div>
+  </div>
+<%- include('footer') %>

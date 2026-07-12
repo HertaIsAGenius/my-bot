@@ -1,4 +1,5 @@
 import { ChatInputCommandInteraction, AttachmentBuilder, MessageFlags } from 'discord.js';
+import { embed, COLORS } from '../utils/embed';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { getLeaderboard, xpForLevel } from '../utils/levels';
 import { HSR_BG, HSR_GOLD, HSR_TEAL, HSR_MUTE, HSR_DARK, FONT, hexPath, loadAvatarBuffer, backdropSlice, goldAccent } from '../utils/canvas';
@@ -12,7 +13,7 @@ const AV_SIZES = [75, 62, 55];
 
 async function top3Command(interaction: ChatInputCommandInteraction) {
   if (!interaction.guild) {
-    await interaction.reply({ content: 'This command must be used in a server.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Guild Only', 'This command must be used in a server.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -20,7 +21,7 @@ async function top3Command(interaction: ChatInputCommandInteraction) {
 
   const entries = getLeaderboard(interaction.guild.id, 3);
   if (entries.length === 0) {
-    await interaction.editReply({ content: 'No XP data yet.' });
+    await interaction.editReply({ embeds: [embed('No XP', 'No XP data yet.')] });
     return;
   }
 

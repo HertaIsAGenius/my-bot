@@ -1,50 +1,51 @@
 <%- include('header', { title: 'Tickets', active: 'tickets' }) %>
   <div class="page-header">
+    <div class="icon">&#9993;</div>
     <h1>Tickets</h1>
   </div>
 
   <% if (tickets.length === 0) { %>
-    <div class="empty"><p>No tickets found.</p></div>
+    <div class="empty">
+      <div class="empty-icon">&#9993;</div>
+      <p>No tickets found for this server.</p>
+    </div>
   <% } else { %>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Guild</th>
-            <th>Reporter</th>
-            <th>Reported User</th>
-            <th>Reason</th>
-            <th>Status</th>
-            <th>Created</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% for (const t of tickets) { %>
+    <div class="path" style="padding:0;">
+      <div class="table-wrap">
+        <table>
+          <thead>
             <tr>
-              <td>#<%= t.id %></td>
-              <td><code><%= t.guildId %></code></td>
-              <td><code><%= t.reporterId %></code></td>
-              <td><%= t.reportedId ? '<code>' + t.reportedId + '</code>' : 'N/A' %></td>
-              <td><%= t.reason %></td>
-              <td><span class="badge <%= t.status %>"><%= t.status %></span></td>
-              <td><%= new Date(t.createdAt).toLocaleString() %></td>
-              <td>
-                <% if (t.status === 'open') { %>
-                  <form method="POST" action="/tickets/close" class="inline-form" onsubmit="return confirm('Close ticket #<%= t.id %>?')">
-                    <input type="hidden" name="guildId" value="<%= t.guildId %>">
-                    <input type="hidden" name="ticketId" value="<%= t.id %>">
-                    <button class="btn btn-success btn-sm">Close</button>
-                  </form>
-                <% } else { %>
-                  <span style="color: var(--text2); font-size: 12px;">Closed</span>
-                <% } %>
-              </td>
+              <th>ID</th>
+              <th>Reporter</th>
+              <th>Category</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Action</th>
             </tr>
-          <% } %>
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            <% for (const t of tickets) { %>
+              <tr>
+                <td>#<%= t.id %></td>
+                <td><code style="font-size:12px;opacity:.6;"><%= t.creator_id || t.reporterId %></code></td>
+                <td><%= t.subject || t.category %></td>
+                <td><span class="badge <%= t.status %>"><%= t.status %></span></td>
+                <td style="white-space:nowrap;"><%= new Date(t.created_at || t.createdAt).toLocaleString() %></td>
+                <td>
+                  <% if (t.status === 'open') { %>
+                    <form method="POST" action="/<%= guildId %>/tickets/close" onsubmit="return confirm('Close ticket #<%= t.id %>?')">
+                      <input type="hidden" name="ticketId" value="<%= t.id %>">
+                      <button class="btn btn-success btn-sm">Close</button>
+                    </form>
+                  <% } else { %>
+                    <span style="color:var(--text-muted);font-size:12px;">Closed</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
     </div>
   <% } %>
 <%- include('footer') %>

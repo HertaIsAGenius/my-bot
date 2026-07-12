@@ -6,12 +6,12 @@ import { clearGuildXp } from '../utils/levels';
 async function xpclearCommand(interaction: ChatInputCommandInteraction) {
   const guild = interaction.guild;
   if (!guild) {
-    await interaction.reply({ content: 'This command must be used in a server.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Guild Only', 'This command must be used in a server.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
   if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageGuild)) {
-    await interaction.reply({ content: 'You need Manage Server permission.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Permission Denied', 'You need Manage Server permission.')], flags: MessageFlags.Ephemeral });
     return;
   }
 

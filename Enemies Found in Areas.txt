@@ -1,0 +1,63 @@
+Enemies that can be Found in certain areas of Herta's Space Station:
+
+Enemies values:
+
+Voidranger: Reaver {Physical, Physical RES} (Credits, Thief's Instinct)
+
+2. Voidranger: Distorter {Imaginary, Imaginary RES} (Credits, Thief's Instinct)
+
+3. Voidranger: Eliminator {Fire, Fire RES} (Credits, Thief's Instinct)
+
+4. Voidranger: Trampler {Physical, Physical RES} (Credits, Thief's Instinct)
+
+5. Antibaryon {Imaginary, Imaginary RES} (Credits, Thief's Instinct)
+
+6. Baryon {Imaginary, Imaginary RES} (Credits, Thief's Instinct)
+
+7. Flame Spawn {Fire, Fire RES} (Credits, Extinguished Core)
+
+8. Frost Spawn {Ice, Ice RES} (Credits, Extinguished Core)
+
+9. Lightning Spawn {Lightning, Lightning RES} (Credits, Extinguished Core)
+
+10. Wind Spawn {Wind, Wind RES} (Credits, Extinguished Core)
+
+11. Blaze Out of Space {Fire, Fire RES} (Credits, Extinguished Core)
+
+12. Ice Out of Space {Ice, Ice RES} (Credits, Extinguished Core)
+
+13. Voidranger: Ranger {Wind, Wind RES} (Credits, Thief's Instinct)
+
+14. Incineration Shadewalker {Fire, Fire RES} (Credits, Extinguished Core)
+
+15. Frigid Prowler {Ice, Ice RES} (Credits, Extinguished Core)
+
+16. Imaginary Weaver {Imaginary, Imaginary RES} (Credits, Thief's Instinct)
+
+17. Space Hound {Physical, Physical RES} (Credits, Thief's Instinct)
+
+18. Voidranger: Suppressor {Quantum, Quantum RES} (Credits, Thief's Instinct)
+
+19. Automaton Beetle {Physical, Physical RES} (Credits, Ancient Part)
+
+20. Imaginary Warp Trotter {Imaginary, Imaginary RES} (Credits, Thief's Instinct)
+
+Enemy Groupings
+
+Enemies have a 66.7% chance of spawning when Searched in a valid Area
+
+| Material Family     | Common (66%)      | Uncommon (25%)   | Rare (7%)        | Legendary (2%)                  |
+| ------------------- | ----------------- | ---------------- | ---------------- | ------------------------------- |
+| Antimatter Legion   | Thief's Instinct  | Usurper's Scheme | Conqueror's Will | **Legion Commander's Insignia** |
+| Fragmentum Monsters | Extinguished Core | Glimmering Core  | Squirming Core   | **Fragmentum Heart**            |
+| Mechanical          | Ancient Part      | Ancient Spindle  | Ancient Engine   | **Ancient Quantum Core**        |
+
+Winnings from Defeating an Enemy
+
+| Credit Reward            | Amount        | Chance |
+| ------------------------ | ------------- | ------ |
+| **Small Credit Cache**   | 300 Credits   | 60%    |
+| **Medium Credit Cache**  | 500 Credits   | 25%    |
+| **Large Credit Cache**   | 1,000 Credits | 10%    |
+| **Massive Credit Cache** | 2,000 Credits | 4%     |
+| **Golden Credit Cache**  | 5,000 Credits | 1%     |

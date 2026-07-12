@@ -1,0 +1,80 @@
+LanBot Embed Formats
+
+1. /hsr profile
+
+ContainerBuilder (accent 0x2B3A67)
+┌────────────────────────────────────────────────┐
+│ # username's Express                           │
+│ ─────────────────────────────────────────────  │
+│                                                │
+│          [Express Image via MediaGallery]      │
+│                                                │
+│ ─────────────────────────────────────────────  │
+│ ## Forge                                       │
+│ Level 1/100                                    │
+│ ■■■■■□□□□□ (loadbar)                           │
+│ Upgrade(s) available: 250 Credits              │
+│ ┌─────────────────────────────────────────┐    │
+│ │ [Forge]                                 │    │
+│ │                                         │    │
+│ └─────────────────────────────────────────┘    │
+│ ─────────────────────────────────────────────  │
+│ ## Relic Vault                                 │
+│ Level 1/100                                    │
+│ ■■■■■□□□□□                                     │
+│ Upgrade(s) available: 250 Credits              │
+│ ┌─────────────────────────────────────────┐    │
+│ │  [Vault]                                │    │
+│ │                                         │    │
+│ └─────────────────────────────────────────┘    │
+│ ─────────────────────────────────────────────  │
+│ ## Herta's Coupons                             │
+│ Level 1/100                                    │
+│ ■■■■■□□□□□                                     │
+│ Upgrade(s) available: 250 Credits              │
+│ ┌─────────────────────────────────────────┐    │
+│ │ [Coupons]                               │    │
+│ │                                         │    │
+│ └─────────────────────────────────────────┘    │
+│ ─────────────────────────────────────────────  │
+│ ## Workshop                                    │
+│ Level 1/100                                    │
+│ ■■■■■□□□□□                                     │
+│ Upgrade(s) available: 250 Credits              │
+│ ┌─────────────────────────────────────────┐    │
+│ │  [Workshop]                             │    │
+│ │                                         │    │
+│ └─────────────────────────────────────────┘    │
+└────────────────────────────────────────────────┘
+
+2. Format of [Explore]
+ContainerBuilder (accent 0x2B3A67)
+├─ # Exploring The Area!
+├─ {Text that elaborates what is inside the area}
+├─ [Separator]
+├─ ## Connected Zones
+├─ {Input Zone}
+├─ {Input Zone}
+├─ [Separator]
+├─ ## Available Resources (use the file 'C:\Users\JP R\Desktop\ProbeBot\Items Found in Areas.txt' to determine which resources pop up, like a number generator, then fill in the "{Add Resource}" section. There can be 2-10 of these sections per room and they have to have their own data values, so whenever someone presses 'gather' it should remove one of these with the claim message(s)"
+├─ {Add Resource} 
+├─ {Add Resource} 
+├─ {Add Resource} 
+├─ {Add Resource} 
+├─ {Add Resource} 
+├─ {Add Resource} 
+├─ [Separator]
+├─ ## Enemies Possible In Room (Use the file 'C:\Users\JP R\Desktop\ProbeBotEnemies Found in Areas.txt' to determine which items and which reward(s) need to be chosen for the search feature. 0-5 different enemy formations can be chosen for every search.
+├─ {add an enemy}
+├─ {add an enemy}
+├─ {add an enemy}
+├─ {add an enemy}
+├─ {add an enemy}
+├─ [Separator]
+├─ ActionRow: [Search] (Search should allow the surrounding area to be searched for enemies.) [Gather] (Gather allows to search surrounding area for resources)
+├─ [Separator]
+└─ ActionRow: [Move To:{Room}] [Move To:{Room}]
+
+3. Format of [Dailies]
+
+

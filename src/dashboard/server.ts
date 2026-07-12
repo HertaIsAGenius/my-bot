@@ -1,11 +1,26 @@
+import 'dotenv/config';
 import express from 'express';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { dataPath } from '../utils/dataPath';
+import { randomBytes } from 'node:crypto';
+import {
+  getAllInfractionGuilds, getInfractionUserIds, getInfractions, deleteInfractions,
+  getAllTickets, getTickets, updateTicket, getTodos, addTodo, editTodo, removeTodo,
+  getAllLogConfigs, getAllChannelLogConfigs, getSlowmodeConfig,
+  getMessageLogCount, getTicketMeta, setTicketMeta, getLogConfig,
+  getChannelLogConfig, setLogConfig, setChannelLogConfig,
+  enableSlowmodeChannel, disableSlowmodeChannel,
+} from '../utils/db';
 
 const app = express();
 const PORT = parseInt(process.env.DASHBOARD_PORT || '3000', 10);
-const dataDir = dataPath();
+
+const CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
+const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
+const BOT_TOKEN = process.env.DISCORD_TOKEN || '';
+const SESSION_SECRET = process.env.SESSION_SECRET || randomBytes(32).toString('hex');
+const DASHBOARD_URL = process.env.DASHBOARD_URL || `http://localhost:${PORT}`;
+
+const sessions = new Map<string, { userId: string; username: string; avatar: string; expires: number }>();
 
 app.set('view engine', 'ejs');
 app.set('views', join(__dirname, 'views'));
@@ -13,235 +28,326 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(join(__dirname, 'public')));
 
-function ensureDataDir() {
-  if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true });
+function generateSessionId(): string {
+  return randomBytes(32).toString('hex');
 }
 
-function readJSON(path: string): any {
-  ensureDataDir();
-  if (!existsSync(path)) return null;
-  try { return JSON.parse(readFileSync(path, 'utf-8')); }
-  catch { return null; }
+function parseCookies(cookieHeader?: string): Record<string, string> {
+  const cookies: Record<string, string> = {};
+  if (!cookieHeader) return cookies;
+  for (const part of cookieHeader.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx > 0) cookies[part.slice(0, idx).trim()] = part.slice(idx + 1).trim();
+  }
+  return cookies;
 }
 
-function writeJSON(path: string, data: any) {
-  ensureDataDir();
-  writeFileSync(path, JSON.stringify(data, null, 2), 'utf-8');
+function setSessionCookie(res: express.Response, sessionId: string) {
+  res.setHeader('Set-Cookie', `session=${sessionId}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400`);
 }
 
-function readJSONL(path: string): any[] {
-  if (!existsSync(path)) return [];
-  try {
-    return readFileSync(path, 'utf-8')
-      .split('\n')
-      .filter(Boolean)
-      .map(line => JSON.parse(line));
-  } catch { return []; }
+function clearSessionCookie(res: express.Response) {
+  res.setHeader('Set-Cookie', `session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`);
 }
 
-// ---------- Dashboard Home ----------
-app.get('/', (req, res) => {
-  const guildFiles = readdirSync(dataDir).filter(f => /^\d+\.json$/.test(f) && f !== 'tickets.json' && f !== 'todos.json' && f !== 'logConfig.json' && f !== 'channelLogConfig.json' && f !== 'slowmodeConfig.json' && f !== 'ticketMeta.json');
+function getSession(req: express.Request): { userId: string; username: string; avatar: string } | null {
+  const cookies = parseCookies(req.headers.cookie);
+  const sessionId = cookies['session'];
+  if (!sessionId) return null;
+  const session = sessions.get(sessionId);
+  if (!session) return null;
+  if (Date.now() > session.expires) {
+    sessions.delete(sessionId);
+    return null;
+  }
+  return session;
+}
 
-  let totalInfractions = 0;
-  let totalUsers = 0;
-  for (const f of guildFiles) {
-    const data = readJSON(join(dataDir, f));
-    if (data) {
-      const users = Object.keys(data);
-      totalUsers += users.length;
-      totalInfractions += users.reduce((sum: number, u: string) => sum + data[u].length, 0);
+async function discordFetch(path: string, token: string, tokenType = 'Bearer'): Promise<any> {
+  const res = await fetch(`https://discord.com/api/v10${path}`, {
+    headers: { Authorization: `${tokenType} ${token}` }
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    console.error(`Discord API error ${res.status}: ${text}`);
+    return null;
+  }
+  return res.json();
+}
+
+async function exchangeCode(code: string, redirectUri: string): Promise<{ access_token: string; token_type: string } | null> {
+  const body = new URLSearchParams({
+    client_id: CLIENT_ID,
+    client_secret: CLIENT_SECRET,
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: redirectUri,
+  });
+  const res = await fetch('https://discord.com/api/v10/oauth2/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+async function getBotGuilds(): Promise<{ id: string; name: string; icon: string | null }[]> {
+  if (!BOT_TOKEN) return [];
+  const guilds = await discordFetch('/users/@me/guilds', BOT_TOKEN, 'Bot');
+  if (!guilds) return [];
+  return guilds.map((g: any) => ({ id: g.id, name: g.name, icon: g.icon }));
+}
+
+function authRequired(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const session = getSession(req);
+  if (!session) {
+    if (req.path.startsWith('/api/')) {
+      res.status(401).json({ error: 'Unauthorized' });
+    } else {
+      res.redirect('/login');
     }
+    return;
+  }
+  (req as any).session = session;
+  next();
+}
+
+// Login page
+app.get('/login', (req, res) => {
+  const session = getSession(req);
+  if (session) return res.redirect('/');
+  res.render('login');
+});
+
+// Discord OAuth entry
+app.get('/auth/discord', (req, res) => {
+  const redirectUri = `${DASHBOARD_URL}/auth/callback`;
+  const scopes = ['identify', 'guilds'].join(' ');
+  const url = `https://discord.com/api/v10/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}`;
+  res.redirect(url);
+});
+
+// OAuth callback
+app.get('/auth/callback', async (req, res) => {
+  const { code, error } = req.query;
+  if (error || !code) {
+    return res.redirect('/login');
+  }
+  const redirectUri = `${DASHBOARD_URL}/auth/callback`;
+  const tokenData = await exchangeCode(code as string, redirectUri);
+  if (!tokenData) {
+    return res.redirect('/login');
+  }
+  const user = await discordFetch('/users/@me', tokenData.access_token, tokenData.token_type);
+  if (!user) {
+    return res.redirect('/login');
+  }
+  const sessionId = generateSessionId();
+  sessions.set(sessionId, {
+    userId: user.id,
+    username: user.username,
+    avatar: user.avatar,
+    expires: Date.now() + 86400000,
+  });
+  setSessionCookie(res, sessionId);
+  res.redirect('/');
+});
+
+// Logout
+app.get('/logout', (req, res) => {
+  const cookies = parseCookies(req.headers.cookie);
+  const sessionId = cookies['session'];
+  if (sessionId) sessions.delete(sessionId);
+  clearSessionCookie(res);
+  res.redirect('/login');
+});
+
+// Guild picker
+app.get('/', authRequired, async (req, res) => {
+  const guilds = await getBotGuilds();
+  const session = (req as any).session;
+  res.render('guilds', { guilds, user: session });
+});
+
+// Guild-scoped: Dashboard home
+app.get('/:guildId/home', authRequired, async (req, res) => {
+  const guildId = req.params.guildId as string;
+  const userIds = getInfractionUserIds(guildId);
+  let totalInfractions = 0;
+  for (const uid of userIds) {
+    totalInfractions += getInfractions(guildId, uid).length;
   }
 
-  const tickets = readJSON(join(dataDir, 'tickets.json')) || {};
-  const allTickets = Object.values(tickets).flat() as any[];
+  const allTickets = (getTickets(guildId) as any[]) || [];
   const openTickets = allTickets.filter((t: any) => t.status === 'open').length;
 
-  const todos = readJSON(join(dataDir, 'todos.json')) || {};
-  const totalTodos = Object.values(todos).flat().length;
+  const todos = getTodos(guildId) as any[];
+  const totalTodos = Array.isArray(todos) ? todos.length : 0;
 
-  const logCfg = readJSON(join(dataDir, 'logConfig.json')) || {};
-  const guildsWithLogging = Object.keys(logCfg).length;
+  const logCfg = getLogConfig(guildId);
+  const guildsWithLogging = logCfg.messages || logCfg.reactions ? 1 : 0;
 
-  const slowCfg = readJSON(join(dataDir, 'slowmodeConfig.json')) || {};
-  const slowChannels = slowCfg.enabledChannels?.length || 0;
+  const slowCfg = getSlowmodeConfig();
+  const slowChannels = slowCfg.enabledChannels.length;
 
-  const meta = readJSON(join(dataDir, 'ticketMeta.json')) || {};
-  const modChannels = Object.values(meta).filter((m: any) => m?.moderatorChannel).length;
+  const m = getTicketMeta(guildId);
+  const modChannels = m.moderatorChannel ? 1 : 0;
 
-  const logFiles = readdirSync(dataDir).filter(f => f.startsWith('logs-') && f.endsWith('.jsonl'));
-  let totalLogLines = 0;
-  for (const f of logFiles) {
-    totalLogLines += readJSONL(join(dataDir, f)).length;
-  }
+  const totalLogLines = getMessageLogCount();
+  const guilds = await getBotGuilds();
+  const session = (req as any).session;
 
   res.render('index', {
-    totalInfractions, totalUsers, openTickets, totalTodos,
+    totalInfractions, totalUsers: userIds.length, openTickets, totalTodos,
     guildsWithLogging, slowChannels, modChannels, totalLogLines,
-    guildCount: guildFiles.length
+    guildCount: 1, guildId, guilds, user: session,
   });
 });
 
-// ---------- Infractions ----------
-app.get('/infractions', (req, res) => {
-  const guildFiles = readdirSync(dataDir).filter(f => /^\d+\.json$/.test(f) && f !== 'tickets.json' && f !== 'todos.json' && f !== 'logConfig.json' && f !== 'channelLogConfig.json' && f !== 'slowmodeConfig.json' && f !== 'ticketMeta.json');
-  const guilds: { id: string; users: { id: string; infractions: any[] }[] }[] = [];
+// Guild-scoped: Infractions
+app.get('/:guildId/infractions', authRequired, async (req, res) => {
+  const guildId = req.params.guildId as string;
+  const userIds = getInfractionUserIds(guildId);
+  const users = userIds.map(uid => ({ id: uid, infractions: getInfractions(guildId, uid) }));
+  const guilds = await getBotGuilds();
+  const session = (req as any).session;
+  res.render('infractions', { guildId, users, hasData: users.length > 0, guilds, user: session });
+});
 
-  for (const f of guildFiles) {
-    const guildId = f.replace('.json', '');
-    const data = readJSON(join(dataDir, f));
-    if (data) {
-      const users = Object.entries(data).map(([userId, infs]) => ({
-        id: userId, infractions: infs as any[]
-      }));
-      guilds.push({ id: guildId, users });
-    }
+app.post('/:guildId/infractions/clear', authRequired, (req, res) => {
+  const guildId = req.params.guildId as string;
+  const { userId } = req.body;
+  deleteInfractions(guildId, userId);
+  res.redirect(`/${guildId}/infractions`);
+});
+
+// Guild-scoped: Tickets
+app.get('/:guildId/tickets', authRequired, async (req, res) => {
+  const guildId = req.params.guildId as string;
+  const tickets = (getTickets(guildId) as any[]) || [];
+  const guilds = await getBotGuilds();
+  const session = (req as any).session;
+  res.render('tickets', { guildId, tickets, guilds, user: session });
+});
+
+app.post('/:guildId/tickets/close', authRequired, (req, res) => {
+  const guildId = req.params.guildId as string;
+  const { ticketId } = req.body;
+  updateTicket(guildId, parseInt(ticketId), { status: 'closed', closed_at: Date.now(), closed_by: 'dashboard' });
+  res.redirect(`/${guildId}/tickets`);
+});
+
+// Guild-scoped: Todos
+app.get('/:guildId/todos', authRequired, async (req, res) => {
+  const guildId = req.params.guildId as string;
+  const items = (getTodos(guildId) as any[]) || [];
+  const guilds = await getBotGuilds();
+  const session = (req as any).session;
+  res.render('todos', { guildId, items, guilds, user: session });
+});
+
+app.post('/:guildId/todos/add', authRequired, (req, res) => {
+  const guildId = req.params.guildId as string;
+  const { text } = req.body;
+  if (text?.trim()) {
+    addTodo(guildId, text.trim(), 'dashboard', 'Dashboard');
   }
-
-  res.render('infractions', { guilds });
+  res.redirect(`/${guildId}/todos`);
 });
 
-app.post('/infractions/clear', (req, res) => {
-  const { guildId, userId } = req.body;
-  const path = join(dataDir, `${guildId}.json`);
-  const data = readJSON(path) || {};
-  delete data[userId];
-  writeJSON(path, data);
-  res.redirect('/infractions');
+app.post('/:guildId/todos/edit', authRequired, (req, res) => {
+  const guildId = req.params.guildId as string;
+  const { id, text } = req.body;
+  editTodo(guildId, parseInt(id), text);
+  res.redirect(`/${guildId}/todos`);
 });
 
-// ---------- Tickets ----------
-app.get('/tickets', (req, res) => {
-  const tickets = readJSON(join(dataDir, 'tickets.json')) || {};
-  res.render('tickets', { tickets: Object.entries(tickets).flatMap(([guildId, ts]) =>
-    (ts as any[]).map(t => ({ ...t, guildId }))
-  ) });
+app.post('/:guildId/todos/remove', authRequired, (req, res) => {
+  const guildId = req.params.guildId as string;
+  const { id } = req.body;
+  removeTodo(guildId, parseInt(id));
+  res.redirect(`/${guildId}/todos`);
 });
 
-app.post('/tickets/close', (req, res) => {
-  const { guildId, ticketId } = req.body;
-  const path = join(dataDir, 'tickets.json');
-  const data = readJSON(path) || {};
-  const list = data[guildId] || [];
-  const ticket = list.find((t: any) => t.id === parseInt(ticketId));
-  if (ticket) {
-    ticket.status = 'closed';
-    ticket.closedAt = Date.now();
-    ticket.closedBy = 'dashboard';
-    writeJSON(path, data);
+// Guild-scoped: Logging
+app.get('/:guildId/logging', authRequired, async (req, res) => {
+  const guildId = req.params.guildId as string;
+  const logCfg: Record<string, any> = {};
+  const rows = getAllLogConfigs() as any[];
+  for (const r of rows) {
+    logCfg[r.guild_id] = { messages: r.messages === 1, reactions: r.reactions === 1 };
   }
-  res.redirect('/tickets');
-});
-
-// ---------- Todo List ----------
-app.get('/todos', (req, res) => {
-  const todos = readJSON(join(dataDir, 'todos.json')) || {};
-  const guildIds = Object.keys(todos);
-  res.render('todos', { guildIds, todos });
-});
-
-app.post('/todos/add', (req, res) => {
-  const { guildId, text } = req.body;
-  if (!guildId || !text?.trim()) return res.redirect('/todos');
-  const path = join(dataDir, 'todos.json');
-  const data = readJSON(path) || {};
-  const list = data[guildId] || [];
-  const id = list.length > 0 ? list[list.length - 1].id + 1 : 1;
-  list.push({ id, text: text.trim(), authorId: 'dashboard', authorTag: 'Dashboard', createdAt: Date.now() });
-  data[guildId] = list;
-  writeJSON(path, data);
-  res.redirect('/todos');
-});
-
-app.post('/todos/edit', (req, res) => {
-  const { guildId, id, text } = req.body;
-  const path = join(dataDir, 'todos.json');
-  const data = readJSON(path) || {};
-  const list = data[guildId] || [];
-  const item = list.find((t: any) => t.id === parseInt(id));
-  if (item) {
-    item.text = text;
-    item.editedAt = Date.now();
-    writeJSON(path, data);
+  const channelLogCfg: Record<string, any> = {};
+  const chRows = getAllChannelLogConfigs() as any[];
+  for (const r of chRows) {
+    channelLogCfg[r.channel_id] = { messages: r.messages === 1, reactions: r.reactions === 1 };
   }
-  res.redirect('/todos');
+  const guilds = await getBotGuilds();
+  const session = (req as any).session;
+  res.render('logging', { guildId, logCfg, channelLogCfg, guilds, user: session });
 });
 
-app.post('/todos/remove', (req, res) => {
-  const { guildId, id } = req.body;
-  const path = join(dataDir, 'todos.json');
-  const data = readJSON(path) || {};
-  const list = data[guildId] || [];
-  data[guildId] = list.filter((t: any) => t.id !== parseInt(id));
-  writeJSON(path, data);
-  res.redirect('/todos');
-});
-
-// ---------- Logging ----------
-app.get('/logging', (req, res) => {
-  const logCfg = readJSON(join(dataDir, 'logConfig.json')) || {};
-  const channelLogCfg = readJSON(join(dataDir, 'channelLogConfig.json')) || {};
-  res.render('logging', { logCfg, channelLogCfg });
-});
-
-app.post('/logging', (req, res) => {
-  const { guildId, type, enabled, channelId } = req.body;
+app.post('/:guildId/logging', authRequired, (req, res) => {
+  const guildId = req.params.guildId as string;
+  const { type, enabled, channelId } = req.body;
   const isChannel = channelId && channelId !== '';
+  const val = enabled === 'true';
 
   if (isChannel) {
-    const path = join(dataDir, 'channelLogConfig.json');
-    const data = readJSON(path) || {};
-    data[channelId] = data[channelId] || {};
-    data[channelId][type] = enabled === 'true';
-    writeJSON(path, data);
+    const existing = getChannelLogConfig(channelId);
+    if (type === 'messages') setChannelLogConfig(channelId, val, existing.reactions);
+    else setChannelLogConfig(channelId, existing.messages, val);
   } else {
-    const path = join(dataDir, 'logConfig.json');
-    const data = readJSON(path) || {};
-    data[guildId] = data[guildId] || {};
-    data[guildId][type] = enabled === 'true';
-    writeJSON(path, data);
+    const existing = getLogConfig(guildId);
+    if (type === 'messages') setLogConfig(guildId, val, existing.reactions);
+    else setLogConfig(guildId, existing.messages, val);
   }
-  res.redirect('/logging');
+  res.redirect(`/${guildId}/logging`);
 });
 
-// ---------- Slowmode ----------
-app.get('/slowmode', (req, res) => {
-  const slowCfg = readJSON(join(dataDir, 'slowmodeConfig.json')) || { enabledChannels: [] };
-  res.render('slowmode', { enabledChannels: slowCfg.enabledChannels || [] });
+// Guild-scoped: Slowmode
+app.get('/:guildId/slowmode', authRequired, async (req, res) => {
+  const guildId = req.params.guildId as string;
+  const slowCfg = getSlowmodeConfig();
+  const guilds = await getBotGuilds();
+  const session = (req as any).session;
+  res.render('slowmode', { guildId, enabledChannels: slowCfg.enabledChannels || [], guilds, user: session });
 });
 
-app.post('/slowmode/toggle', (req, res) => {
+app.post('/:guildId/slowmode/toggle', authRequired, (req, res) => {
+  const guildId = req.params.guildId as string;
   const { channelId, enabled } = req.body;
-  const path = join(dataDir, 'slowmodeConfig.json');
-  const data = readJSON(path) || { enabledChannels: [] };
   if (enabled === 'true') {
-    if (!data.enabledChannels.includes(channelId)) data.enabledChannels.push(channelId);
+    enableSlowmodeChannel(guildId, channelId);
   } else {
-    data.enabledChannels = data.enabledChannels.filter((c: string) => c !== channelId);
+    disableSlowmodeChannel(guildId, channelId);
   }
-  writeJSON(path, data);
-  res.redirect('/slowmode');
+  res.redirect(`/${guildId}/slowmode`);
 });
 
-// ---------- Mod Channel ----------
-app.get('/modchannel', (req, res) => {
-  const meta = readJSON(join(dataDir, 'ticketMeta.json')) || {};
-  res.render('modchannel', { meta });
+// Guild-scoped: Mod Channel
+app.get('/:guildId/modchannel', authRequired, async (req, res) => {
+  const guildId = req.params.guildId as string;
+  const meta: Record<string, any> = {};
+  const m = getTicketMeta(guildId);
+  if (m.moderatorChannel) {
+    meta[guildId] = { moderatorChannel: m.moderatorChannel };
+  }
+  const guilds = await getBotGuilds();
+  const session = (req as any).session;
+  res.render('modchannel', { guildId, meta, guilds, user: session });
 });
 
-app.post('/modchannel', (req, res) => {
-  const { guildId, channelId } = req.body;
-  const path = join(dataDir, 'ticketMeta.json');
-  const data = readJSON(path) || {};
-  data[guildId] = data[guildId] || {};
+app.post('/:guildId/modchannel', authRequired, (req, res) => {
+  const guildId = req.params.guildId as string;
+  const { channelId } = req.body;
   if (channelId?.trim()) {
-    data[guildId].moderatorChannel = channelId.trim();
+    setTicketMeta(guildId, { moderatorChannel: channelId.trim() });
   } else {
-    delete data[guildId].moderatorChannel;
+    setTicketMeta(guildId, { moderatorChannel: null });
   }
-  writeJSON(path, data);
-  res.redirect('/modchannel');
+  res.redirect(`/${guildId}/modchannel`);
 });
 
 app.listen(PORT, () => {

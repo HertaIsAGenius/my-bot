@@ -12,24 +12,24 @@ import {
   PermissionsBitField,
   MessageFlags
 } from 'discord.js';
-import { COLORS } from '../utils/embed';
+import { embed, COLORS } from '../utils/embed';
 import { autoSlowmode } from '../utils/autoSlowmode';
 import { enableSlowmodeChannel, disableSlowmodeChannel } from '../utils/slowmodeConfig';
 
 async function slowmodeCommand(interaction: ChatInputCommandInteraction) {
   if (!interaction.guild) {
-    await interaction.reply({ content: 'This command must be used in a server.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Guild Only', 'This command must be used in a server.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
   if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageGuild)) {
-    await interaction.reply({ content: 'You need Manage Server permission.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Permission Denied', 'You need Manage Server permission.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
   const channel = interaction.channel;
   if (!channel?.isTextBased() || channel.isDMBased() || channel.isThread()) {
-    await interaction.reply({ content: 'This command only works in text channels.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Invalid Channel', 'This command only works in text channels.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -62,7 +62,7 @@ async function slowmodeCommand(interaction: ChatInputCommandInteraction) {
 
   col.on('collect', async (sel: StringSelectMenuInteraction) => {
     if (sel.user.id !== interaction.user.id) {
-      await sel.reply({ content: 'These controls are not for you.', flags: MessageFlags.Ephemeral });
+      await sel.reply({ embeds: [embed('Not for You', 'These controls are not for you.')], flags: MessageFlags.Ephemeral });
       return;
     }
 

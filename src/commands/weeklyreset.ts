@@ -6,12 +6,12 @@ import { resetWeeklyXp } from '../utils/levels';
 async function weeklyresetCommand(interaction: ChatInputCommandInteraction) {
   const guild = interaction.guild;
   if (!guild) {
-    await interaction.reply({ content: 'This command must be used in a server.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Guild Only', 'This command must be used in a server.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
   if (!interaction.memberPermissions?.has('ManageGuild')) {
-    await interaction.reply({ content: 'You need Manage Server permission to reset weekly XP.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Permission Denied', 'You need Manage Server permission to reset weekly XP.')], flags: MessageFlags.Ephemeral });
     return;
   }
 

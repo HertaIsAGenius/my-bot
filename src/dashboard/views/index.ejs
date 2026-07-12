@@ -1,46 +1,45 @@
 <%- include('header', { title: 'Dashboard', active: 'dashboard' }) %>
   <div class="page-header">
+    <div class="icon">&#9632;</div>
     <h1>Dashboard</h1>
   </div>
 
-  <div class="cards">
-    <div class="card">
-      <div class="value blue"><%= guildCount %></div>
-      <div class="label">Guilds Tracked</div>
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value"><%= totalInfractions %></div>
+      <div class="stat-label">Infractions</div>
     </div>
-    <div class="card">
-      <div class="value red"><%= totalInfractions %></div>
-      <div class="label">Total Infractions</div>
+    <div class="stat-card">
+      <div class="stat-value"><%= totalUsers %></div>
+      <div class="stat-label">Users</div>
     </div>
-    <div class="card">
-      <div class="value purple"><%= totalUsers %></div>
-      <div class="label">Users with Infractions</div>
+    <div class="stat-card">
+      <div class="stat-value"><%= openTickets %></div>
+      <div class="stat-label">Open Tickets</div>
     </div>
-    <div class="card">
-      <div class="value cyan"><%= openTickets %></div>
-      <div class="label">Open Tickets</div>
+    <div class="stat-card">
+      <div class="stat-value"><%= totalTodos %></div>
+      <div class="stat-label">Todo Items</div>
     </div>
-    <div class="card">
-      <div class="value green"><%= totalTodos %></div>
-      <div class="label">Todo Items</div>
+    <div class="stat-card">
+      <div class="stat-value"><%= guildsWithLogging %></div>
+      <div class="stat-label">Guilds with Logging</div>
     </div>
-    <div class="card">
-      <div class="value orange"><%= guildsWithLogging %></div>
-      <div class="label">Guilds with Logging</div>
+    <div class="stat-card">
+      <div class="stat-value"><%= slowChannels %></div>
+      <div class="stat-label">Slowmode Channels</div>
     </div>
-    <div class="card">
-      <div class="value"><%= slowChannels %></div>
-      <div class="label">Slowmode Channels</div>
+    <div class="stat-card">
+      <div class="stat-value"><%= modChannels %></div>
+      <div class="stat-label">Mod Channels Set</div>
     </div>
-    <div class="card">
-      <div class="value cyan"><%= modChannels %></div>
-      <div class="label">Mod Channels Set</div>
-    </div>
-    <div class="card">
-      <div class="value purple"><%= totalLogLines %></div>
-      <div class="label">Logged Events</div>
+    <div class="stat-card">
+      <div class="stat-value"><%= totalLogLines %></div>
+      <div class="stat-label">Logged Events</div>
     </div>
   </div>
 
-  <p style="color: var(--text2); font-size: 14px;">This dashboard reads and writes the same data files the bot uses. Changes made here are reflected immediately.</p>
+  <div class="callout">
+    This dashboard reads and writes the same data the bot uses. Changes made here are reflected immediately. Use the server selector at the top to switch between servers.
+  </div>
 <%- include('footer') %>

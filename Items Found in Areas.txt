@@ -1,0 +1,124 @@
+Items found in specific areas!
+
+1. Herta's Space Station
+
+1. Artifact Shelf {Storage Items}
+2. Research Crate {Research Materials}
+3. Forgotten Chest {Chest Items}
+4. Archived Records {Archive Items}
+5. Equipment Rack {Equipment Items}
+6. Sealed Container {Container Items}
+7. Loose Debris {Scavenged Items}
+8. Supply Crate {Supply Items}
+9. Specimen Locker {Specimen Items}
+10. Storage Cabinet {Storage Items}
+11. Utility Cabinet {Utility Items}
+12. Cargo Box {Cargo Items}
+13. IPC Supply Case {IPC Supplies}
+14. Research Locker {Research Materials}
+15. Cryo Container {Cryogenic Items}
+16. Sample Case {Sample Items}
+17. Observation Box {Observation Items}
+18. Maintenance Crate {Maintenance Items}
+19. Security Locker {Security Items}
+20. Emergency Cache {Emergency Supplies}
+
+21. Experiment Console {Research Data}
+22. Analysis Terminal {Research Data}
+23. Data Archive {Archive Data}
+24. Research Notes {Research Documents}
+25. Specimen Pod {Specimen Items}
+26. Chemical Cabinet {Chemical Supplies}
+27. Sample Tray {Sample Items}
+28. Curio Display {Curio Items}
+29. Diagnostic Station {Diagnostic Data}
+30. Equipment Bench {Equipment Parts}
+31. Calibration Module {Calibration Parts}
+32. Storage Cylinder {Stored Materials}
+33. Test Chamber {Experimental Items}
+34. Observation Capsule {Observation Data}
+35. Energy Cell Rack {Energy Components}
+
+36. Damaged Terminal {Damaged Data}
+37. Broken Drone {Mechanical Parts}
+38. Discarded Toolkit {Tool Parts}
+39. Loose Components {Mechanical Parts}
+40. Scrap Heap {Scrap Materials}
+41. Ruined Machinery {Machine Parts}
+42. Broken Monitor {Electronic Parts}
+43. Power Junction {Energy Components}
+44. Damaged Container {Damaged Storage}
+45. Scattered Documents {Lost Documents}
+46. Supply Cart {Supply Items}
+47. Maintenance Trolley {Maintenance Supplies}
+48. Abandoned Workstation {Workstation Data}
+
+69. Tool Box {Tool Supplies}
+70. Supply Bin {Supply Items}
+71. Data Chip {Digital Data}
+72. Utility Case {Utility Supplies}
+73. Portable Scanner {Scanning Equipment}
+74. Battery Pack {Energy Components}
+75. Parts Crate {Mechanical Parts}
+76. Medical Supply Box {Medical Supplies}
+77. Engineer's Kit {Engineering Supplies}
+78. Research Cache {Research Materials}
+
+| Tag Type                | Example Rewards                                    |
+| ----------------------- | -------------------------------------------------- |
+| Chest Items             | Credits ×1000, Stellar Jade ×20, Relic Fragment ×1 |
+| Storage Items           | Credits, Common Materials                          |
+| Research Materials      | Thief's Bell, Extinguished Core, Ancient Part      |
+| Archive Items           | Adventure Log, Research Log                        |
+| Equipment Items         | Enhancement Materials                              |
+| Container Items         | Random Consumables                                 |
+| Scavenged Items         | Scrap, Common Materials                            |
+| Supply Items            | Consumables, Credits                               |
+| Specimen Items          | Biological Samples, Research Materials             |
+| Utility Items           | Basic Materials                                    |
+| Cargo Items             | Credits, Materials                                 |
+| IPC Supplies            | Credits, IPC Components                            |
+| Cryogenic Items         | Frozen Samples                                     |
+| Sample Items            | Lab Samples                                        |
+| Observation Items       | Observation Reports                                |
+| Maintenance Items       | Mechanical Parts                                   |
+| Security Items          | Access Cards, Credits                              |
+| Emergency Supplies      | Healing Items                                      |
+| Research Data           | Research EXP, Logs                                 |
+| Archive Data            | Digital Records                                    |
+| Research Documents      | Adventure Log, Experiment Journal                  |
+| Chemical Supplies       | Chemicals                                          |
+| Curio Items             | Curios, Rare Materials                             |
+| Diagnostic Data         | Scan Results                                       |
+| Equipment Parts         | Machine Parts                                      |
+| Calibration Parts       | Precision Components                               |
+| Stored Materials        | Upgrade Materials                                  |
+| Experimental Items      | Rare Materials                                     |
+| Observation Data        | Observation Reports                                |
+| Energy Components       | Batteries, Power Cells                             |
+| Damaged Data            | Corrupted Logs                                     |
+| Mechanical Parts        | Ancient Parts, Circuits                            |
+| Scrap Materials         | Scrap Metal                                        |
+| Electronic Parts        | Circuit Boards                                     |
+| Damaged Storage         | Random Salvage                                     |
+| Lost Documents          | Notes, Reports                                     |
+| Maintenance Supplies    | Repair Kits                                        |
+| Workstation Data        | Research Files                                     |
+| Contained Items         | Rare Samples                                       |
+| Artifact Items          | Relic Fragments                                    |
+| Preserved Items         | Preserved Samples                                  |
+| Collection Items        | Display Curios                                     |
+| Rare Research           | Rare Research Materials                            |
+| Secure Documents        | Confidential Files                                 |
+| Personal Logs           | Personal Journals                                  |
+| Memory Data             | Memory Fragments                                   |
+| Digital Data            | Data Chips                                         |
+| Research Reports        | Reports                                            |
+| Audio Logs              | Voice Recordings                                   |
+| Investigation Documents | Investigation Files                                |
+| Exploration Documents   | Adventure Logs                                     |
+| Incident Records        | Incident Reports                                   |
+| Tool Supplies           | Repair Tools                                       |
+| Scanning Equipment      | Scanner Components                                 |
+| Medical Supplies        | Healing Items                                      |
+| Engineering Supplies    | Engineering Parts                                  |

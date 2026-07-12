@@ -1,5 +1,4 @@
-import * as fs from 'fs';
-import { dataPath } from './dataPath';
+import { getLevelRow, upsertLevelRow, getAllLevels, deleteLevel, deleteAllGuildLevels, resetWeeklyXp as dbResetWeekly, LevelRow } from './db';
 
 export interface LevelData {
   userId: string;
@@ -11,42 +10,24 @@ export interface LevelData {
   weeklyResetTimestamp: number;
 }
 
-const DATA_FILE = dataPath('levels.json');
-
-let dataCache: Record<string, LevelData> | null = null;
-
-function readData(): Record<string, LevelData> {
-  if (dataCache) return dataCache;
-  try {
-    if (fs.existsSync(DATA_FILE)) {
-      const parsed = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8')) as Record<string, LevelData>;
-      dataCache = parsed;
-      return parsed;
-    }
-  } catch {}
-  dataCache = {};
-  return dataCache;
-}
-
-function writeData(data: Record<string, LevelData>) {
-  dataCache = data;
-  if (!fs.existsSync(dataPath())) fs.mkdirSync(dataPath(), { recursive: true });
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+function rowToData(row: LevelRow): LevelData {
+  return {
+    userId: row.user_id,
+    guildId: row.guild_id,
+    xp: row.xp,
+    level: Math.floor((-50 + Math.sqrt(2500 + 200 * row.xp)) / 100),
+    lastMessageTimestamp: row.last_message_at,
+    weeklyXp: row.weekly_xp,
+    weeklyResetTimestamp: row.weekly_reset_at,
+  };
 }
 
 const cooldowns = new Map<string, number>();
 
 export function getLevelData(userId: string, guildId: string): LevelData | null {
-  const d = readData()[`${guildId}_${userId}`];
-  if (!d) return null;
-  if (d.weeklyXp === undefined) d.weeklyXp = 0;
-  if (d.weeklyResetTimestamp === undefined) d.weeklyResetTimestamp = Date.now();
-  return d;
-}
-
-function ensureWeekly(entry: LevelData) {
-  if (entry.weeklyXp === undefined) entry.weeklyXp = 0;
-  if (entry.weeklyResetTimestamp === undefined) entry.weeklyResetTimestamp = Date.now();
+  const row = getLevelRow(guildId, userId);
+  if (!row) return null;
+  return rowToData(row);
 }
 
 export function addXp(userId: string, guildId: string): { leveledUp: boolean; oldLevel: number; newLevel: number; xp: number } {
@@ -60,46 +41,37 @@ export function addXp(userId: string, guildId: string): { leveledUp: boolean; ol
   }
   cooldowns.set(key, now);
 
-  const data = readData();
-  let entry = data[key];
-  const oldLevel = entry?.level ?? 0;
-
-  if (!entry) {
-    entry = { userId, guildId, xp: 0, level: 0, lastMessageTimestamp: 0, weeklyXp: 0, weeklyResetTimestamp: now };
-    data[key] = entry;
-  }
-
-  ensureWeekly(entry);
+  const row = getLevelRow(guildId, userId);
+  const oldLevel = row ? Math.floor((-50 + Math.sqrt(2500 + 200 * row.xp)) / 100) : 0;
 
   const gained = Math.floor(Math.random() * 11) + 15;
-  entry.xp += gained;
-  entry.weeklyXp += gained;
-  entry.lastMessageTimestamp = now;
-  entry.level = Math.floor((-50 + Math.sqrt(2500 + 200 * entry.xp)) / 100);
-  writeData(data);
+  const newXp = (row?.xp ?? 0) + gained;
+  const newWeeklyXp = (row?.weekly_xp ?? 0) + gained;
 
-  return { leveledUp: entry.level > oldLevel, oldLevel, newLevel: entry.level, xp: entry.xp };
+  upsertLevelRow(guildId, userId, {
+    xp: newXp,
+    weekly_xp: newWeeklyXp,
+    last_message_at: now,
+  });
+
+  const newLevel = Math.floor((-50 + Math.sqrt(2500 + 200 * newXp)) / 100);
+  return { leveledUp: newLevel > oldLevel, oldLevel, newLevel, xp: newXp };
 }
 
 export function addXpDirect(userId: string, guildId: string, amount: number): { leveledUp: boolean; oldLevel: number; newLevel: number; xp: number } {
-  const key = `${guildId}_${userId}`;
-  const data = readData();
-  let entry = data[key];
-  const oldLevel = entry?.level ?? 0;
+  const row = getLevelRow(guildId, userId);
+  const oldLevel = row ? Math.floor((-50 + Math.sqrt(2500 + 200 * row.xp)) / 100) : 0;
 
-  if (!entry) {
-    entry = { userId, guildId, xp: 0, level: 0, lastMessageTimestamp: 0, weeklyXp: 0, weeklyResetTimestamp: Date.now() };
-    data[key] = entry;
-  }
+  const newXp = (row?.xp ?? 0) + amount;
+  const newWeeklyXp = (row?.weekly_xp ?? 0) + amount;
 
-  ensureWeekly(entry);
+  upsertLevelRow(guildId, userId, {
+    xp: newXp,
+    weekly_xp: newWeeklyXp,
+  });
 
-  entry.xp += amount;
-  entry.weeklyXp += amount;
-  entry.level = Math.floor((-50 + Math.sqrt(2500 + 200 * entry.xp)) / 100);
-  writeData(data);
-
-  return { leveledUp: entry.level > oldLevel, oldLevel, newLevel: entry.level, xp: entry.xp };
+  const newLevel = Math.floor((-50 + Math.sqrt(2500 + 200 * newXp)) / 100);
+  return { leveledUp: newLevel > oldLevel, oldLevel, newLevel, xp: newXp };
 }
 
 export function xpForLevel(level: number): number {
@@ -115,69 +87,39 @@ export function progressToNext(entry: LevelData): { current: number; needed: num
 }
 
 export function getLeaderboard(guildId: string, limit = 10): LevelData[] {
-  return Object.values(readData())
-    .filter(e => e.guildId === guildId)
+  return getAllLevels(guildId)
     .sort((a, b) => b.xp - a.xp)
-    .slice(0, limit);
+    .slice(0, limit)
+    .map(rowToData);
 }
 
 export function getWeeklyLeaderboard(guildId: string, limit = 10): LevelData[] {
-  return Object.values(readData())
-    .filter(e => e.guildId === guildId)
-    .map(e => {
-      if (e.weeklyXp === undefined) e.weeklyXp = 0;
-      if (e.weeklyResetTimestamp === undefined) e.weeklyResetTimestamp = 0;
-      return e;
-    })
-    .sort((a, b) => (b.weeklyXp || 0) - (a.weeklyXp || 0))
-    .slice(0, limit);
+  return getAllLevels(guildId)
+    .sort((a, b) => (b.weekly_xp || 0) - (a.weekly_xp || 0))
+    .slice(0, limit)
+    .map(rowToData);
 }
 
 export function getRank(userId: string, guildId: string): number {
-  const sorted = Object.values(readData())
-    .filter(e => e.guildId === guildId)
+  const sorted = getAllLevels(guildId)
     .sort((a, b) => b.xp - a.xp);
-  const idx = sorted.findIndex(e => e.userId === userId);
+  const idx = sorted.findIndex(e => e.user_id === userId);
   return idx === -1 ? 0 : idx + 1;
 }
 
 export function getWeeklyRank(userId: string, guildId: string): number {
-  const sorted = Object.values(readData())
-    .filter(e => e.guildId === guildId)
-    .map(e => {
-      if (e.weeklyXp === undefined) e.weeklyXp = 0;
-      if (e.weeklyResetTimestamp === undefined) e.weeklyResetTimestamp = 0;
-      return e;
-    })
-    .sort((a, b) => (b.weeklyXp || 0) - (a.weeklyXp || 0));
-  const idx = sorted.findIndex(e => e.userId === userId);
+  const sorted = getAllLevels(guildId)
+    .sort((a, b) => (b.weekly_xp || 0) - (a.weekly_xp || 0));
+  const idx = sorted.findIndex(e => e.user_id === userId);
   return idx === -1 ? 0 : idx + 1;
 }
 
 export function resetWeeklyXp(guildId: string): number {
-  const data = readData();
-  let count = 0;
-  const now = Date.now();
-  for (const key of Object.keys(data)) {
-    if (data[key].guildId === guildId) {
-      data[key].weeklyXp = 0;
-      data[key].weeklyResetTimestamp = now;
-      count++;
-    }
-  }
-  if (count > 0) writeData(data);
-  return count;
+  return dbResetWeekly(guildId);
 }
 
 export function clearGuildXp(guildId: string): number {
-  const data = readData();
-  let count = 0;
-  for (const key of Object.keys(data)) {
-    if (data[key].guildId === guildId) {
-      delete data[key];
-      count++;
-    }
-  }
-  if (count > 0) writeData(data);
-  return count;
+  const rows = getAllLevels(guildId);
+  deleteAllGuildLevels(guildId);
+  return rows.length;
 }

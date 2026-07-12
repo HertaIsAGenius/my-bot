@@ -172,20 +172,19 @@ async function closeFlow(interaction: ChatInputCommandInteraction | Message, gui
           .setRequired(false).setMaxLength(512).setPlaceholder('Why is this ticket being closed?')
       )
     );
-  const replyMsg = await interaction.reply({ content: 'Closing ticket...', embeds: [] }) as Message;
-  const msg = replyMsg;
+  const msg = await interaction.reply({ embeds: [embed('Closing...', 'Closing ticket...')] }) as Message;
   if (msg) {
     const btn = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder().setCustomId('ticket_confirm_close').setLabel('Confirm Close').setStyle(ButtonStyle.Danger)
     );
-    await msg.edit({ content: 'Click below to confirm closing this ticket.', components: [btn] });
+    await msg.edit({ embeds: [embed('Confirm Close', 'Click below to confirm closing this ticket.')], components: [btn] });
     const confirm = await msg.awaitMessageComponent({
       filter: (i: any) => i.customId === 'ticket_confirm_close' && i.user.id === user.id,
       componentType: ComponentType.Button,
       time: 30000
     }).catch(() => null);
     if (!confirm) {
-      await msg.edit({ content: 'Close cancelled.', components: [] });
+      await msg.edit({ embeds: [embed('Cancelled', 'Close cancelled.')], components: [] });
       return;
     }
     await confirm.showModal(modal);
@@ -196,12 +195,12 @@ async function closeFlow(interaction: ChatInputCommandInteraction | Message, gui
     if (!modalSub) return;
     const reason = modalSub.fields.getTextInputValue('reason') || undefined;
     await modalSub.deferUpdate();
-    await finishClose(modalSub as any, guild, user, ticket, reason);
+    await finishClose(modalSub as any, guild, user, ticket, reason, true);
     try { await msg.delete().catch(() => {}); } catch {}
   }
 }
 
-async function finishClose(ctx: any, guild: Guild, user: User, ticket: Ticket, reason?: string) {
+async function finishClose(ctx: any, guild: Guild, user: User, ticket: Ticket, reason?: string, fromModal = false) {
   const channel = guild.channels.cache.get(ticket.channelId);
   let transcriptPath: string | undefined;
 
@@ -220,7 +219,8 @@ async function finishClose(ctx: any, guild: Guild, user: User, ticket: Ticket, r
       { name: 'Reason', value: reason || 'No reason given', inline: false }
     );
 
-  await ctx.reply({ embeds: [resultEmbed] });
+  if (fromModal) await ctx.editReply({ embeds: [resultEmbed] });
+  else await ctx.reply({ embeds: [resultEmbed] });
 
   try {
     const closeChan = await guild.channels.fetch(ticket.channelId);
@@ -362,7 +362,7 @@ async function statsFlow(interaction: ChatInputCommandInteraction, guild: Guild)
 
 async function ticketCommand(interaction: ChatInputCommandInteraction) {
   if (!interaction.guild) {
-    await interaction.reply({ content: 'This command must be used in a server.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Guild Only', 'This command must be used in a server.')], flags: MessageFlags.Ephemeral });
     return;
   }
   const guild = interaction.guild;
@@ -372,7 +372,7 @@ async function ticketCommand(interaction: ChatInputCommandInteraction) {
 
   const needsManage = ['config', 'search', 'stats', 'reopen'].includes(sub);
   if (needsManage && !interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageGuild)) {
-    await interaction.reply({ content: 'You need **Manage Server** permission.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed('Permission Denied', 'You need **Manage Server** permission.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -384,7 +384,7 @@ async function ticketCommand(interaction: ChatInputCommandInteraction) {
   switch (sub) {
     case 'claim':
       if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageGuild)) {
-        await interaction.reply({ content: 'You need **Manage Server** permission.', flags: MessageFlags.Ephemeral });
+        await interaction.reply({ embeds: [embed('Permission Denied', 'You need **Manage Server** permission.')], flags: MessageFlags.Ephemeral });
         return;
       }
       await claimFlow(interaction, guild, user);
@@ -397,21 +397,21 @@ async function ticketCommand(interaction: ChatInputCommandInteraction) {
       break;
     case 'priority':
       if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageGuild)) {
-        await interaction.reply({ content: 'You need **Manage Server** permission.', flags: MessageFlags.Ephemeral });
+        await interaction.reply({ embeds: [embed('Permission Denied', 'You need **Manage Server** permission.')], flags: MessageFlags.Ephemeral });
         return;
       }
       await priorityFlow(interaction, guild);
       break;
     case 'note':
       if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageGuild)) {
-        await interaction.reply({ content: 'You need **Manage Server** permission.', flags: MessageFlags.Ephemeral });
+        await interaction.reply({ embeds: [embed('Permission Denied', 'You need **Manage Server** permission.')], flags: MessageFlags.Ephemeral });
         return;
       }
       await noteFlow(interaction, guild, user);
       break;
     case 'rename':
       if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageGuild)) {
-        await interaction.reply({ content: 'You need **Manage Server** permission.', flags: MessageFlags.Ephemeral });
+        await interaction.reply({ embeds: [embed('Permission Denied', 'You need **Manage Server** permission.')], flags: MessageFlags.Ephemeral });
         return;
       }
       await renameFlow(interaction);
@@ -423,7 +423,7 @@ async function ticketCommand(interaction: ChatInputCommandInteraction) {
       await statsFlow(interaction, guild);
       break;
     default:
-      await interaction.reply({ content: 'Unknown subcommand.', flags: MessageFlags.Ephemeral });
+      await interaction.reply({ embeds: [embed('Error', 'Unknown subcommand.')], flags: MessageFlags.Ephemeral });
   }
 }
 
@@ -433,7 +433,7 @@ async function ticketMessageFlow(message: Message, guild: Guild, user: User) {
   if (sub === 'close') {
     await closeFlow(message, guild, user);
   } else {
-    await message.reply('Usage: `!ticket close` (must be in a ticket channel).');
+    await message.reply({ embeds: [embed('Usage', 'Usage: `!ticket close` (must be in a ticket channel).')] });
   }
 }
 
