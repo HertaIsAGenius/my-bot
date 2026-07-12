@@ -137,6 +137,7 @@ function getRedirectUri(req: express.Request): string {
 // Discord OAuth entry
 app.get('/auth/discord', (req, res) => {
   const redirectUri = getRedirectUri(req);
+  console.log('[Dashboard] /auth/discord: redirect_uri =', redirectUri, ', host =', req.headers.host, ', proto =', req.headers['x-forwarded-proto']);
   const scopes = ['identify', 'guilds'].join(' ');
   const url = `https://discord.com/api/v10/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}`;
   res.redirect(url);
@@ -144,21 +145,22 @@ app.get('/auth/discord', (req, res) => {
 
 // OAuth callback
 app.get('/auth/callback', async (req, res) => {
-  const { code, error } = req.query;
+  const { code, error, error_description } = req.query;
   if (error || !code) {
     console.error('OAuth callback error:', error || 'no code');
-    return res.redirect('/login');
+    return res.send(`<h1>OAuth Error</h1><pre>${JSON.stringify({ error, error_description, query: req.query })}</pre><a href="/login">Back to login</a>`);
   }
   const redirectUri = getRedirectUri(req);
+  console.log('[Dashboard] Callback received. redirect_uri =', redirectUri, ', host =', req.headers.host, ', proto =', req.headers['x-forwarded-proto']);
   const tokenData = await exchangeCode(code as string, redirectUri);
   if (!tokenData) {
     console.error('Token exchange failed. redirect_uri used:', redirectUri);
-    return res.redirect('/login');
+    return res.send(`<h1>Token Exchange Failed</h1><pre>redirect_uri: ${redirectUri}\nCheck server logs for details.</pre><a href="/login">Back to login</a>`);
   }
   const user = await discordFetch('/users/@me', tokenData.access_token, tokenData.token_type);
   if (!user) {
     console.error('Failed to fetch user from Discord API');
-    return res.redirect('/login');
+    return res.send(`<h1>Failed to fetch user</h1><a href="/login">Back to login</a>`);
   }
   const sessionId = generateSessionId();
   sessions.set(sessionId, {
