@@ -132,32 +132,46 @@ function getActiveSlot(userId: string): number | null {
   return slots.sort((a: any, b: any) => b.last_played.localeCompare(a.last_played))[0].slot_number;
 }
 
-function buildWarpMenu(player: any): ContainerBuilder {
+function getWishCount(userId: string, slot: number, itemId: string): number {
+  const inv = db.prepare('SELECT quantity FROM hsr_inventory WHERE user_id = ? AND slot_number = ? AND item_id = ?').get(userId, slot, itemId) as any;
+  return inv?.quantity ?? 0;
+}
+
+function buildWarpMenu(player: any, userId: string, slot: number): ContainerBuilder {
+  const stdWishes = getWishCount(userId, slot, 'standard_wish');
+  const limWishes = getWishCount(userId, slot, 'limited_wish');
+  const pity = getPity(userId, slot, 'stellar_warp');
+  const pityDisplay = pity.total_pulls > 0 ? `Since last 5★: **${pity.pity_5}** pulls` : 'No pulls yet';
+
   return new ContainerBuilder()
     .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Warp'))
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`You have **${player.stellar_jade.toLocaleString()}** Jades`))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`**${player.stellar_jade.toLocaleString()}** Stellar Jade`))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`${pityDisplay}`))
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
     .addTextDisplayComponents(new TextDisplayBuilder().setContent('## Standard Wishes'))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`You have **${stdWishes}** Standard Wishes`))
     .addActionRowComponents(
       new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId('hsr_warp_pull_standard_1').setLabel('Standard Wish (x1)').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('hsr_warp_pull_standard_10').setLabel('Standard Wishes (x10)').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('hsr_warp_pull_standard_1').setLabel('Pull x1').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('hsr_warp_pull_standard_10').setLabel('Pull x10').setStyle(ButtonStyle.Primary),
       ),
     )
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
     .addTextDisplayComponents(new TextDisplayBuilder().setContent('## Limited Wishes'))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`You have **${limWishes}** Limited Wishes`))
     .addActionRowComponents(
       new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId('hsr_warp_pull_limited_1').setLabel('Limited Wish (x1)').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('hsr_warp_pull_limited_10').setLabel('Limited Wishes (x10)').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('hsr_warp_pull_limited_1').setLabel('Pull x1').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('hsr_warp_pull_limited_10').setLabel('Pull x10').setStyle(ButtonStyle.Primary),
       ),
     )
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
     .addActionRowComponents(
       new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId('hsr_warp_shop').setLabel('Shop').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('hsr_warp_history_stellar_warp').setLabel('History').setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('hsr_warp_shop').setLabel('Open Shop').setStyle(ButtonStyle.Secondary),
       ),
     );
 }
@@ -166,29 +180,31 @@ function buildShopMenu(player: any): ContainerBuilder {
   return new ContainerBuilder()
     .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Star Rail Shop'))
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`**${player.stellar_jade.toLocaleString()}** Stellar Jade available`))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
     .addTextDisplayComponents(new TextDisplayBuilder().setContent('## Standard Wishes'))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent('1x Standard Wish -160 Jades'))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent('10x Standard Wish -1600 Jades'))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent('1x Standard Wish — 160 Jades'))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent('10x Standard Wish — 1600 Jades'))
     .addActionRowComponents(
       new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId('hsr_warp_buy_standard_1').setLabel('1x Standard Wish').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('hsr_warp_buy_standard_10').setLabel('10x Standard Wish').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('hsr_warp_buy_standard_1').setLabel('Buy 1x').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('hsr_warp_buy_standard_10').setLabel('Buy 10x').setStyle(ButtonStyle.Secondary),
       ),
     )
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
     .addTextDisplayComponents(new TextDisplayBuilder().setContent('## Limited Wishes'))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent('1x Limited Wish -160 Jades'))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent('10x Limited Wish -1600 Jades'))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent('1x Limited Wish — 160 Jades'))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent('10x Limited Wish — 1600 Jades'))
     .addActionRowComponents(
       new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId('hsr_warp_buy_limited_1').setLabel('1x Limited Wish').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('hsr_warp_buy_limited_10').setLabel('10x Limited Wish').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('hsr_warp_buy_limited_1').setLabel('Buy 1x').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('hsr_warp_buy_limited_10').setLabel('Buy 10x').setStyle(ButtonStyle.Secondary),
       ),
     )
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
     .addActionRowComponents(
       new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('hsr_warp').setLabel('Back').setStyle(ButtonStyle.Secondary),
       ),
     );
 }
@@ -196,6 +212,7 @@ function buildShopMenu(player: any): ContainerBuilder {
 function buildPurchaseResultContainer(kind: 'limited' | 'standard', quantity: number, cost: number): ContainerBuilder {
   const label = kind === 'limited' ? 'Limited Wish' : 'Standard Wish';
   const plural = quantity === 1 ? '' : 's';
+  const bannerType = kind;
   return new ContainerBuilder()
     .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Purchase Complete'))
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
@@ -204,12 +221,21 @@ function buildPurchaseResultContainer(kind: 'limited' | 'standard', quantity: nu
     .addActionRowComponents(
       new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
-          .setCustomId('hsr_profile')
-          .setLabel('Back')
-          .setStyle(ButtonStyle.Secondary),
+          .setCustomId(`hsr_warp_pull_${bannerType}_1`)
+          .setLabel('Pull x1')
+          .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
-          .setCustomId('hsr_warp_shop')
-          .setLabel('Open Shop')
+          .setCustomId(`hsr_warp_pull_${bannerType}_10`)
+          .setLabel('Pull x10')
+          .setStyle(ButtonStyle.Primary),
+      ),
+    )
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+    .addActionRowComponents(
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId('hsr_warp')
+          .setLabel('Back')
           .setStyle(ButtonStyle.Secondary),
       ),
     );
@@ -226,12 +252,25 @@ function buildPullResultContainer(results: Array<{ rarity: number; itemName: str
     .addActionRowComponents(
       new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
-          .setCustomId('hsr_profile')
-          .setLabel('Back')
-          .setStyle(ButtonStyle.Secondary),
+          .setCustomId(`hsr_warp_pull_${kind}_1`)
+          .setLabel('Pull x1')
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId(`hsr_warp_pull_${kind}_10`)
+          .setLabel('Pull x10')
+          .setStyle(ButtonStyle.Primary),
+      ),
+    )
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+    .addActionRowComponents(
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
           .setCustomId('hsr_warp')
-          .setLabel('Warp')
+          .setLabel('Warp Menu')
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+          .setCustomId('hsr_profile')
+          .setLabel('Back')
           .setStyle(ButtonStyle.Secondary),
       ),
     );
@@ -251,7 +290,7 @@ export async function handleHsrWarp(interaction: any) {
     return;
   }
 
-  const container = buildWarpMenu(player);
+  const container = buildWarpMenu(player, userId, slot);
   await interaction.reply({
     components: [container],
     flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,

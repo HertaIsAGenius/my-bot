@@ -212,6 +212,15 @@ function registerAllHandlers() {
   registry.registerButton('hsr_profile', (i) => hsrCmd.handleHsrProfile(i));
   registry.registerButton('hsr_quests', (i) => hsrCmd.handleHsrQuestBoard(i));
 
+  // HSR team & relic management
+  const hsrTeamCmd: CmdMod = require('./commands/hsr_team');
+  registry.registerButton('hsr_team', (i) => hsrTeamCmd.handleHsrTeam(i));
+  registry.registerSelectMenu('hsr_team_select', (i) => hsrTeamCmd.handleHsrTeamSelect(i));
+  registry.registerButton(/^hsr_team_assign_/, (i) => hsrTeamCmd.handleHsrTeamAssign(i));
+  registry.registerButton(/^hsr_team_remove_/, (i) => hsrTeamCmd.handleHsrTeamRemove(i));
+  registry.registerButton(/^hsr_relic_view_/, (i) => hsrTeamCmd.handleHsrRelicView(i));
+  registry.registerSelectMenu(/^hsr_relic_equip_/, (i) => hsrTeamCmd.handleHsrRelicEquip(i));
+
   // Reaction Roles
   registry.registerSelectMenu(/^rr_sel_/, async (i) => {
     const messageId = i.customId.replace('rr_sel_', '');

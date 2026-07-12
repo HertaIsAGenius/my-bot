@@ -1881,5 +1881,69 @@ export function getWarpHistory(userId: string, slot: number, bannerId: string, l
   return db.prepare('SELECT * FROM hsr_warp_history WHERE user_id = ? AND slot_number = ? AND banner_id = ? ORDER BY timestamp DESC, id DESC LIMIT ?').all(userId, slot, bannerId, limit);
 }
 
+// ── Team Management ──
+
+export function getPlayerRoster(userId: string, slot: number): any[] {
+  return db.prepare(`SELECT pc.*, c.name, c.path, c.element, c.rarity, c.base_hp, c.base_atk, c.base_def, c.base_speed, c.taunt_value
+    FROM hsr_player_characters pc JOIN hsr_characters c ON pc.character_id = c.id
+    WHERE pc.user_id = ? AND pc.slot_number = ? ORDER BY pc.equipped DESC, pc.party_slot ASC, c.rarity DESC`).all(userId, slot);
+}
+
+export function setPartySlot(userId: string, slot: number, charId: string, partySlot: number): boolean {
+  if (partySlot < 1 || partySlot > 4) return false;
+  const owned = db.prepare('SELECT 1 FROM hsr_player_characters WHERE user_id = ? AND slot_number = ? AND character_id = ?').get(userId, slot, charId) as any;
+  if (!owned) return false;
+  const existing = db.prepare('SELECT character_id FROM hsr_player_characters WHERE user_id = ? AND slot_number = ? AND equipped = 1 AND party_slot = ?').get(userId, slot, partySlot) as any;
+  if (existing && existing.character_id !== charId) {
+    db.prepare('UPDATE hsr_player_characters SET equipped = 0, party_slot = NULL WHERE user_id = ? AND slot_number = ? AND character_id = ?').run(userId, slot, existing.character_id);
+  }
+  db.prepare('UPDATE hsr_player_characters SET equipped = 1, party_slot = ? WHERE user_id = ? AND slot_number = ? AND character_id = ?').run(partySlot, userId, slot, charId);
+  return true;
+}
+
+export function unequipCharacter(userId: string, slot: number, charId: string): boolean {
+  const owned = db.prepare('SELECT 1 FROM hsr_player_characters WHERE user_id = ? AND slot_number = ? AND character_id = ? AND equipped = 1').get(userId, slot, charId) as any;
+  if (!owned) return false;
+  db.prepare('UPDATE hsr_player_characters SET equipped = 0, party_slot = NULL WHERE user_id = ? AND slot_number = ? AND character_id = ?').run(userId, slot, charId);
+  return true;
+}
+
+// ── Relic Management ──
+
+export function getPlayerRelics(userId: string, slot: number): any[] {
+  return db.prepare('SELECT * FROM hsr_relics WHERE user_id = ? AND slot_number = ? ORDER BY rarity DESC, level DESC').all(userId, slot);
+}
+
+export function getCharacterRelics(userId: string, slot: number, charId: string): any[] {
+  return db.prepare('SELECT * FROM hsr_relics WHERE user_id = ? AND slot_number = ? AND character_id = ? ORDER BY piece_type').all(userId, slot, charId);
+}
+
+export function getRelicById(relicId: number): any {
+  return db.prepare('SELECT * FROM hsr_relics WHERE id = ?').get(relicId);
+}
+
+export function equipRelic(userId: string, slot: number, relicId: number, charId: string): boolean {
+  const relic = db.prepare('SELECT * FROM hsr_relics WHERE id = ? AND user_id = ? AND slot_number = ?').get(relicId, userId, slot) as any;
+  if (!relic) return false;
+  const existing = db.prepare('SELECT id FROM hsr_relics WHERE user_id = ? AND slot_number = ? AND character_id = ? AND piece_type = ?').get(userId, slot, charId, relic.piece_type) as any;
+  if (existing) {
+    db.prepare('UPDATE hsr_relics SET character_id = NULL WHERE id = ?').run(existing.id);
+  }
+  db.prepare('UPDATE hsr_relics SET character_id = ? WHERE id = ?').run(charId, relicId);
+  return true;
+}
+
+export function unequipRelic(userId: string, slot: number, relicId: number): boolean {
+  const owned = db.prepare('SELECT 1 FROM hsr_relics WHERE id = ? AND user_id = ? AND slot_number = ?').get(relicId, userId, slot) as any;
+  if (!owned) return false;
+  db.prepare('UPDATE hsr_relics SET character_id = NULL WHERE id = ?').run(relicId);
+  return true;
+}
+
+export function addRelic(userId: string, slot: number, data: { set_name: string; piece_type: string; rarity: number; main_stat: string; sub_stats: string }): number {
+  const result = db.prepare('INSERT INTO hsr_relics (user_id, slot_number, set_name, piece_type, rarity, level, main_stat, sub_stats) VALUES (?, ?, ?, ?, ?, 0, ?, ?)').run(userId, slot, data.set_name, data.piece_type, data.rarity, data.main_stat, data.sub_stats);
+  return Number(result.lastInsertRowid);
+}
+
 // ── Re-export the db instance for direct use if needed ──
 export { db };

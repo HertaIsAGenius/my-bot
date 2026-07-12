@@ -228,6 +228,7 @@ export async function handleHsrProfile(interaction: any) {
     .addActionRowComponents(
       new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder().setCustomId('hsr_quests').setLabel('Quest Board').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('hsr_team').setLabel('Party').setStyle(ButtonStyle.Secondary),
       ),
     )
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))

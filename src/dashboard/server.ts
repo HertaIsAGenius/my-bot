@@ -22,6 +22,7 @@ const DASHBOARD_URL = process.env.DASHBOARD_URL || `http://localhost:${PORT}`;
 
 const sessions = new Map<string, { userId: string; username: string; avatar: string; expires: number }>();
 
+app.set('trust proxy', true);
 app.set('view engine', 'ejs');
 app.set('views', join(__dirname, 'views'));
 app.use(express.urlencoded({ extended: true }));
@@ -76,20 +77,27 @@ async function discordFetch(path: string, token: string, tokenType = 'Bearer'): 
 }
 
 async function exchangeCode(code: string, redirectUri: string): Promise<{ access_token: string; token_type: string } | null> {
+  const basicAuth = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
   const body = new URLSearchParams({
-    client_id: CLIENT_ID,
-    client_secret: CLIENT_SECRET,
     grant_type: 'authorization_code',
     code,
     redirect_uri: redirectUri,
   });
+  console.log('[Dashboard] Token exchange: redirect_uri =', redirectUri, ', client_id =', CLIENT_ID);
   const res = await fetch('https://discord.com/api/v10/oauth2/token', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': `Basic ${basicAuth}`,
+    },
     body: body.toString(),
   });
-  if (!res.ok) return null;
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) {
+    console.error('Token exchange failed:', res.status, JSON.stringify(data));
+    return null;
+  }
+  return data;
 }
 
 async function getBotGuilds(): Promise<{ id: string; name: string; icon: string | null }[]> {
@@ -120,9 +128,15 @@ app.get('/login', (req, res) => {
   res.render('login');
 });
 
+function getRedirectUri(req: express.Request): string {
+  const proto = req.headers['x-forwarded-proto'] as string || 'http';
+  const host = req.headers['x-forwarded-host'] as string || req.headers.host || `localhost:${PORT}`;
+  return `${proto}://${host}/auth/callback`;
+}
+
 // Discord OAuth entry
 app.get('/auth/discord', (req, res) => {
-  const redirectUri = `${DASHBOARD_URL}/auth/callback`;
+  const redirectUri = getRedirectUri(req);
   const scopes = ['identify', 'guilds'].join(' ');
   const url = `https://discord.com/api/v10/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}`;
   res.redirect(url);
@@ -132,15 +146,18 @@ app.get('/auth/discord', (req, res) => {
 app.get('/auth/callback', async (req, res) => {
   const { code, error } = req.query;
   if (error || !code) {
+    console.error('OAuth callback error:', error || 'no code');
     return res.redirect('/login');
   }
-  const redirectUri = `${DASHBOARD_URL}/auth/callback`;
+  const redirectUri = getRedirectUri(req);
   const tokenData = await exchangeCode(code as string, redirectUri);
   if (!tokenData) {
+    console.error('Token exchange failed. redirect_uri used:', redirectUri);
     return res.redirect('/login');
   }
   const user = await discordFetch('/users/@me', tokenData.access_token, tokenData.token_type);
   if (!user) {
+    console.error('Failed to fetch user from Discord API');
     return res.redirect('/login');
   }
   const sessionId = generateSessionId();
@@ -151,6 +168,7 @@ app.get('/auth/callback', async (req, res) => {
     expires: Date.now() + 86400000,
   });
   setSessionCookie(res, sessionId);
+  console.log(`User ${user.username} (${user.id}) logged in via dashboard`);
   res.redirect('/');
 });
 

@@ -11,6 +11,7 @@ interface CombatState {
   turnIndex: number;
   turnOrder: { type: 'ally' | 'enemy'; index: number }[];
   active: boolean;
+  log: string[];
 }
 
 interface CombatCharacter {
@@ -138,6 +139,15 @@ export function buildCombatEmbed(state: CombatState): object {
   lines.push('**Turn Order**');
   lines.push(turnOrderLines.join('\n'));
   lines.push('');
+
+  if (state.log.length > 0) {
+    const recentLog = state.log.slice(-6);
+    lines.push('**Combat Log**');
+    for (const entry of recentLog) {
+      lines.push(`> ${entry}`);
+    }
+    lines.push('');
+  }
 
   lines.push('**Party**');
   for (const c of state.characters) {
@@ -396,6 +406,7 @@ export function startCombat(interaction: any, userId: string, slot: number, pick
     turnIndex: 0,
     turnOrder: [],
     active: true,
+    log: ['Combat begins!'],
   };
 
   recalculateTurnOrder(state);
@@ -556,9 +567,11 @@ export async function handleHsrCombatAction(interaction: any) {
   const target = targets[0];
 
   if (action === 'ultimate') {
+    let totalDmg = 0;
     for (const enemy of state.enemies.filter(e => e.alive)) {
       const dmg = dealDamage(char.atk, enemy.def, multiplier, enemy.broken);
       enemy.hp = Math.max(0, enemy.hp - dmg);
+      totalDmg += dmg;
       if (enemy.hp <= 0) enemy.alive = false;
       if (enemy.weakness.includes(char.element)) {
         enemy.toughness = Math.max(0, enemy.toughness - 30);
@@ -567,6 +580,7 @@ export async function handleHsrCombatAction(interaction: any) {
         }
       }
     }
+    state.log.push(`${char.name} uses **Ultimate** on all enemies for **${totalDmg}** DMG!`);
   } else {
     const dmg = dealDamage(char.atk, target.def, multiplier, target.broken);
     target.hp = Math.max(0, target.hp - dmg);
@@ -577,6 +591,9 @@ export async function handleHsrCombatAction(interaction: any) {
         target.broken = true;
       }
     }
+    const actionLabel = action === 'basic' ? 'Basic ATK' : 'Skill';
+    const brokenMsg = target.broken && target.hp > 0 ? ' **[BROKEN]**' : '';
+    state.log.push(`${char.name} uses **${actionLabel}** on ${target.name}${brokenMsg} for **${dmg}** DMG!`);
   }
 
   const allEnemiesDead = state.enemies.every(e => !e.alive);
@@ -627,6 +644,7 @@ export async function handleHsrCombatEnemyTurn(interaction: any) {
       enemy.broken = false;
       enemy.toughness = enemy.maxToughness;
       resultLines.push(`**${enemy.name}** recovers from weakness break!`);
+      state.log.push(`${enemy.name} recovers from break!`);
       continue;
     }
 
@@ -640,8 +658,10 @@ export async function handleHsrCombatEnemyTurn(interaction: any) {
     if (target.hp <= 0) target.alive = false;
 
     resultLines.push(`**${enemy.name}** attacks **${target.name}** for **${dmg}** DMG!`);
+    state.log.push(`${enemy.name} hits ${target.name} for **${dmg}** DMG!`);
     if (!target.alive) {
       resultLines.push(`💀 **${target.name}** has fallen!`);
+      state.log.push(`💀 ${target.name} has fallen!`);
     }
   }
 
@@ -710,8 +730,10 @@ export async function handleHsrCombatRun(interaction: any) {
     if (target.hp <= 0) target.alive = false;
 
     failLines.push(`**${enemy.name}** hits **${target.name}** for **${dmg}** DMG!`);
+    state.log.push(`${enemy.name} hits ${target.name} for **${dmg}** DMG!`);
     if (!target.alive) {
       failLines.push(`💀 **${target.name}** has fallen!`);
+      state.log.push(`💀 ${target.name} has fallen!`);
     }
   }
 
