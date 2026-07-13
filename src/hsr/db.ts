@@ -1586,6 +1586,14 @@ export function syncAllFromTxtFiles(): void {
   }
 }
 
+export function getHsrStats(): { characters: number; enemies: number; players: number; lightCones: number } {
+  const characters = (db.prepare('SELECT COUNT(*) as c FROM hsr_characters').get() as any).c;
+  const enemies = (db.prepare('SELECT COUNT(*) as c FROM hsr_enemies').get() as any).c;
+  const players = (db.prepare('SELECT COUNT(DISTINCT user_id || slot_number) as c FROM hsr_players').get() as any).c;
+  const lightCones = (db.prepare('SELECT COUNT(*) as c FROM hsr_light_cone_templates').get() as any).c;
+  return { characters, enemies, players, lightCones };
+}
+
 // ── Player query helpers ──
 
 export interface SaveSlot {

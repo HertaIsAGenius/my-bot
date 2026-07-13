@@ -124,12 +124,12 @@ function authRequired(req: express.Request, res: express.Response, next: express
 // Login page
 app.get('/login', (req, res) => {
   const session = getSession(req);
-  if (session) return res.redirect('/');
+  if (session) return res.redirect('/dashboard');
   res.render('login');
 });
 
 function getRedirectUri(req: express.Request): string {
-  const proto = req.headers['x-forwarded-proto'] as string || (DASHBOARD_URL.startsWith('https') ? 'https' : 'http');
+  const proto = req.headers['x-forwarded-proto'] as string || 'http';
   const host = req.headers['x-forwarded-host'] as string || req.headers.host || `localhost:${PORT}`;
   return `${proto}://${host}/auth/callback`;
 }
@@ -171,7 +171,7 @@ app.get('/auth/callback', async (req, res) => {
   });
   setSessionCookie(res, sessionId);
   console.log(`User ${user.username} (${user.id}) logged in via dashboard`);
-  res.redirect('/');
+  res.redirect('/dashboard');
 });
 
 // Logout
@@ -183,8 +183,19 @@ app.get('/logout', (req, res) => {
   res.redirect('/login');
 });
 
-// Guild picker
-app.get('/', authRequired, async (req, res) => {
+// Landing page (public)
+app.get('/', async (req, res) => {
+  try {
+    const { getHsrStats } = await import('../hsr/db');
+    const stats = getHsrStats();
+    res.render('landing', { stats });
+  } catch {
+    res.render('landing', { stats: { characters: 0, enemies: 0, players: 0, lightCones: 0 } });
+  }
+});
+
+// Guild picker (auth required)
+app.get('/dashboard', authRequired, async (req, res) => {
   const guilds = await getBotGuilds();
   const session = (req as any).session;
   res.render('guilds', { guilds, user: session });
