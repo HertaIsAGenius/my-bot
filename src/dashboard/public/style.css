@@ -794,7 +794,8 @@ select {
 
 /* ===== LANDING PAGE ===== */
 body.landing-page {
-  overflow: auto;
+  height: auto;
+  overflow-y: scroll;
   display: block;
   min-height: 100vh;
   --gold: #cba969;

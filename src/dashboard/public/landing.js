@@ -52,12 +52,20 @@
   var routeProgress = document.getElementById('routeProgress');
 
   function maxScroll() {
-    return Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
+    var doc = document.documentElement;
+    var body = document.body;
+    var h = Math.max(doc.scrollHeight, body.scrollHeight);
+    return Math.max(h - window.innerHeight, 1);
+  }
+
+  function getScrollY() {
+    return window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
   }
 
   function update() {
-    var y = window.scrollY;
-    var frac = Math.min(Math.max(y / maxScroll(), 0), 1);
+    var y = getScrollY();
+    var total = maxScroll();
+    var frac = Math.min(Math.max(y / total, 0), 1);
     var station = Math.min(5, Math.max(1, Math.ceil(frac * 5) || 1));
 
     if (rpCurrent) rpCurrent.textContent = station;
@@ -71,7 +79,7 @@
   update();
 
   function goToNextStation() {
-    var y = window.scrollY;
+    var y = getScrollY();
     var frac = y / maxScroll();
     var currentStation = Math.min(5, Math.max(1, Math.ceil(frac * 5) || 1));
     var nextStation = currentStation >= 5 ? 0 : currentStation;
