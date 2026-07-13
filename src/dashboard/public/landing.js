@@ -1,78 +1,65 @@
-(function () {
-  // Navbar solid on scroll
-  var nav = document.getElementById('landingNav');
-  if (nav) {
-    window.addEventListener('scroll', function () {
-      nav.classList.toggle('scrolled', window.scrollY > 40);
-    });
-  }
+// Scroll reveal
+const revealEls = document.querySelectorAll('.reveal, .stop');
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('in-view');
+      io.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.15 });
+revealEls.forEach(el => io.observe(el));
 
-  // Mobile menu toggle
-  var burger = document.getElementById('landingBurger');
-  var menu = document.getElementById('mobileMenu');
-  if (burger && menu) {
-    burger.addEventListener('click', function () {
-      burger.classList.toggle('open');
-      menu.classList.toggle('open');
-    });
-    menu.querySelectorAll('a').forEach(function (a) {
-      a.addEventListener('click', function () {
-        burger.classList.remove('open');
-        menu.classList.remove('open');
+// Split-flap counter animation
+function animateFlap(el, target) {
+  const digits = String(target).padStart(el.children.length, '0').split('');
+  el.querySelectorAll('.flap').forEach((flap, i) => {
+    let current = 0;
+    const targetDigit = parseInt(digits[i], 10);
+    const interval = setInterval(() => {
+      flap.textContent = current;
+      if (current === targetDigit) clearInterval(interval);
+      current = (current + 1) % 10;
+    }, 60 + i * 15);
+  });
+}
+
+const boardObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      document.querySelectorAll('.flap-row').forEach(row => {
+        animateFlap(row, row.dataset.target);
       });
-    });
-  }
+      boardObserver.disconnect();
+    }
+  });
+}, { threshold: 0.4 });
+const boardSection = document.querySelector('.board-section');
+if (boardSection) boardObserver.observe(boardSection);
 
-  // Smooth scroll for anchor links
-  document.querySelectorAll('a[href^="#"]').forEach(function (a) {
-    a.addEventListener('click', function (e) {
-      var target = document.querySelector(a.getAttribute('href'));
-      if (target) {
-        e.preventDefault();
-        var offset = nav ? nav.offsetHeight + 16 : 80;
-        var top = target.getBoundingClientRect().top + window.pageYOffset - offset;
-        window.scrollTo({ top: top, behavior: 'smooth' });
-      }
+// Mobile menu
+const burger = document.getElementById('landingBurger');
+const mobileMenu = document.getElementById('mobileMenu');
+if (burger && mobileMenu) {
+  burger.addEventListener('click', () => {
+    burger.classList.toggle('open');
+    mobileMenu.classList.toggle('open');
+  });
+  mobileMenu.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', () => {
+      burger.classList.remove('open');
+      mobileMenu.classList.remove('open');
     });
   });
+}
 
-  // Animate stat counters
-  function animateCounters() {
-    document.querySelectorAll('.hero-stat-value[data-count]').forEach(function (el) {
-      if (el.dataset.animated) return;
-      var rect = el.getBoundingClientRect();
-      if (rect.top < window.innerHeight && rect.bottom > 0) {
-        el.dataset.animated = '1';
-        var target = parseInt(el.dataset.count, 10) || 0;
-        var duration = 1200;
-        var start = performance.now();
-        function step(now) {
-          var progress = Math.min((now - start) / duration, 1);
-          var ease = 1 - Math.pow(1 - progress, 3);
-          el.textContent = Math.round(target * ease);
-          if (progress < 1) requestAnimationFrame(step);
-        }
-        requestAnimationFrame(step);
-      }
-    });
-  }
-
-  // Fade-in on scroll
-  function fadeOnScroll() {
-    document.querySelectorAll('.feature-card, .dual-row, .visual-card, .hero-stat').forEach(function (el) {
-      if (el.dataset.visible) return;
-      var rect = el.getBoundingClientRect();
-      if (rect.top < window.innerHeight - 60) {
-        el.dataset.visible = '1';
-        el.classList.add('visible');
-      }
-    });
-  }
-
-  window.addEventListener('scroll', function () {
-    animateCounters();
-    fadeOnScroll();
+// Smooth scroll
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', (e) => {
+    const target = document.querySelector(a.getAttribute('href'));
+    if (target) {
+      e.preventDefault();
+      target.scrollIntoView({ behavior: 'smooth' });
+    }
   });
-  animateCounters();
-  fadeOnScroll();
-})();
+});

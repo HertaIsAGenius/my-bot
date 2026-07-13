@@ -9,30 +9,33 @@
 <body class="landing-page">
 
   <!-- NAVBAR -->
-  <nav class="landing-nav" id="landingNav">
-    <a href="#home" class="landing-brand">
-      <img src="/ProbeBotPfpBlackAndWhite.png" alt="ProbeBot" class="landing-logo-img">
-      <span>ProbeBot</span>
-    </a>
-    <div class="landing-nav-links">
-      <a href="#home">Home</a>
-      <span class="nav-sep"></span>
-      <a href="#features">Features</a>
-      <span class="nav-sep"></span>
-      <a href="#projects">Projects</a>
+  <header class="site-nav" id="landingNav">
+    <div class="site-nav-inner">
+      <a href="#home" class="brand">
+        <img src="/ProbeBotPfpBlackAndWhite.png" alt="ProbeBot" class="brand-pfp">
+        <span class="brand-text">ProbeBot</span>
+        <span class="brand-line">// HSR-01</span>
+      </a>
+      <nav class="nav-links">
+        <a href="#home" class="nav-link">Home</a>
+        <span class="nav-sep"></span>
+        <a href="#features" class="nav-link">Features</a>
+        <span class="nav-sep"></span>
+        <a href="#projects" class="nav-link">Projects</a>
+      </nav>
+      <div class="nav-actions">
+        <a href="/login" class="btn btn-ghost">Dashboard</a>
+        <span class="nav-sep"></span>
+        <a href="https://discord.com/oauth2/authorize?client_id=1122198237542101103&scope=bot&permissions=8" class="btn btn-primary" target="_blank" rel="noopener">Add to Discord</a>
+      </div>
+      <button class="nav-burger" id="landingBurger" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
     </div>
-    <div class="landing-nav-actions">
-      <a href="/login" class="landing-btn-ghost">Dashboard</a>
-      <span class="nav-sep"></span>
-      <a href="https://discord.com/oauth2/authorize?client_id=1122198237542101103&scope=bot&permissions=8" class="landing-btn-primary" target="_blank" rel="noopener">Add to Discord</a>
-    </div>
-    <button class="landing-burger" id="landingBurger" aria-label="Menu">
-      <span></span><span></span><span></span>
-    </button>
-  </nav>
+  </header>
 
   <!-- MOBILE MENU -->
-  <div class="landing-mobile-menu" id="mobileMenu">
+  <div class="mobile-menu" id="mobileMenu">
     <a href="#home">Home</a>
     <a href="#features">Features</a>
     <a href="#projects">Projects</a>
@@ -40,223 +43,234 @@
     <a href="https://discord.com/oauth2/authorize?client_id=1122198237542101103&scope=bot&permissions=8" target="_blank" rel="noopener">Add to Discord</a>
   </div>
 
-  <!-- HERO -->
-  <section class="landing-hero" id="home">
-    <div class="hero-glow"></div>
-    <div class="hero-content">
-      <h1 class="hero-title">ProbeBot</h1>
-      <p class="hero-subtitle">Your Honkai: Star Rail Companion</p>
-      <p class="hero-desc">Party management, turn-based combat, exploration, warp tracking, and more — all inside Discord.</p>
-      <div class="hero-actions">
-        <a href="https://discord.com/oauth2/authorize?client_id=1122198237542101103&scope=bot&permissions=8" class="landing-btn-primary lg" target="_blank" rel="noopener">Add to Discord</a>
-        <a href="/login" class="landing-btn-ghost lg">Open Dashboard</a>
+  <main>
+    <!-- HERO -->
+    <section class="hero" id="home">
+      <div class="wrap">
+        <div class="eyebrow"><span class="dot"></span> Astral Express · Now Boarding</div>
+        <h1 class="title">ProbeBot<span class="title-sub">Your Honkai: Star Rail companion, running entirely inside Discord.</span></h1>
+        <p class="hero-desc">Party management, turn-based combat, exploration, and warp tracking — no client, no download. Just your server and a bot that plays it straight.</p>
+        <div class="hero-actions">
+          <a href="https://discord.com/oauth2/authorize?client_id=1122198237542101103&scope=bot&permissions=8" class="btn btn-primary btn-lg" target="_blank" rel="noopener">Add to Discord</a>
+          <a href="/login" class="btn btn-ghost btn-lg">Open Dashboard</a>
+        </div>
+        <div class="hero-note">⟶ Departing from Herta Space Station · Boarding via slash command</div>
       </div>
-      <div class="hero-stats">
-        <div class="hero-stat">
-          <span class="hero-stat-value" data-count="<%= stats.characters %>">0</span>
-          <span class="hero-stat-label">Characters</span>
-        </div>
-        <div class="hero-stat-divider"></div>
-        <div class="hero-stat">
-          <span class="hero-stat-value" data-count="<%= stats.enemies %>">0</span>
-          <span class="hero-stat-label">Enemies</span>
-        </div>
-        <div class="hero-stat-divider"></div>
-        <div class="hero-stat">
-          <span class="hero-stat-value" data-count="<%= stats.players %>">0</span>
-          <span class="hero-stat-label">Players</span>
-        </div>
-        <div class="hero-stat-divider"></div>
-        <div class="hero-stat">
-          <span class="hero-stat-value" data-count="<%= stats.lightCones %>">0</span>
-          <span class="hero-stat-label">Light Cones</span>
-        </div>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- FEATURES -->
-  <section class="landing-section" id="features">
-    <div class="section-inner">
-      <div class="section-header">
-        <span class="section-tag">Features</span>
-        <h2>Everything you need<br>for your HSR journey.</h2>
-      </div>
-      <div class="features-grid">
-        <div class="feature-card">
-          <div class="feature-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <!-- STATS BOARD -->
+    <section class="board-section">
+      <div class="wrap">
+        <div class="board reveal">
+          <div class="board-header">
+            <span>Manifest — Live Registry</span>
+            <span class="live"><span class="dot"></span> Synced</span>
           </div>
-          <h3>Party Management</h3>
-          <p>Build your 4-member team, equip light cones, manage relics, and swap characters on the fly.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/><circle cx="12" cy="12" r="4"/></svg>
+          <div class="board-grid">
+            <div class="board-cell">
+              <div class="flap-row" data-target="<%= stats.characters %>">
+                <% for (let i = 0; i < String(stats.characters).length; i++) { %><div class="flap">0</div><% } %>
+              </div>
+              <div class="board-label">Characters</div>
+            </div>
+            <div class="board-cell">
+              <div class="flap-row" data-target="<%= stats.enemies %>">
+                <% for (let i = 0; i < String(stats.enemies).length; i++) { %><div class="flap">0</div><% } %>
+              </div>
+              <div class="board-label">Enemy Types</div>
+            </div>
+            <div class="board-cell">
+              <div class="flap-row" data-target="<%= stats.players %>">
+                <% for (let i = 0; i < String(stats.players).length; i++) { %><div class="flap">0</div><% } %>
+              </div>
+              <div class="board-label">Players</div>
+            </div>
+            <div class="board-cell">
+              <div class="flap-row" data-target="<%= stats.lightCones %>">
+                <% for (let i = 0; i < String(stats.lightCones).length; i++) { %><div class="flap">0</div><% } %>
+              </div>
+              <div class="board-label">Light Cones</div>
+            </div>
           </div>
-          <h3>Turn-Based Combat</h3>
-          <p>Full turn-based combat system with weaknesses, toughness breaks, skills, and ultimates.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
-          </div>
-          <h3>World Exploration</h3>
-          <p>Navigate locations, gather resources, discover hidden nodes, and complete deliveries.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="7.5 4.21 12 6.81 16.5 4.21"/><polyline points="7.5 19.79 7.5 14.6 3 12"/><polyline points="21 12 16.5 14.6 16.5 19.79"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-          </div>
-          <h3>Warp System</h3>
-          <p>Pull on standard and limited banners with pity tracking, stellar jade, and warp history.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="m9 16 2 2 4-4"/></svg>
-          </div>
-          <h3>Daily Missions</h3>
-          <p>Auto-assigned daily commissions with crafting, exploration, delivery, and gathering objectives.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-          </div>
-          <h3>Astral Express</h3>
-          <p>Upgrade rooms, craft items, manage storage, and forge relics aboard the Express.</p>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- DEEP DIVE: Party -->
-  <section class="landing-section landing-dual" id="projects">
-    <div class="section-inner">
-      <div class="section-header">
-        <span class="section-tag">Projects</span>
-        <h2>Built for depth.</h2>
-      </div>
-      <div class="dual-row">
-        <div class="dual-text">
-          <h3>Party Management</h3>
-          <p>Assemble your dream team from 11 unique characters across 7 paths. Equip light cones, assign relics with set bonuses, and optimize stats. Your party, your strategy.</p>
-          <ul class="dual-list">
-            <li>4-member team with role diversity</li>
-            <li>Light cone equipment with passives</li>
-            <li>Relic sets with 2pc and 4pc bonuses</li>
-            <li>Character level and trace progression</li>
-          </ul>
+    <!-- FEATURES / ROUTE -->
+    <section class="section" id="features">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div>
+            <div class="section-eyebrow">The Route</div>
+            <h2 class="section-title">Six stops, one continuous journey through the Astral Express.</h2>
+          </div>
+          <div class="section-note">Every system below runs on Discord's slash commands — no separate app.</div>
         </div>
-        <div class="dual-visual">
-          <div class="visual-card party-visual">
-            <div class="pv-slot">
-              <div class="pv-avatar fire">H</div>
-              <div class="pv-name">Hook</div>
-              <div class="pv-lv">Lv.40</div>
-            </div>
-            <div class="pv-slot">
-              <div class="pv-avatar ice">M</div>
-              <div class="pv-name">March 7th</div>
-              <div class="pv-lv">Lv.35</div>
-            </div>
-            <div class="pv-slot">
-              <div class="pv-avatar wind">D</div>
-              <div class="pv-name">Dan Heng</div>
-              <div class="pv-lv">Lv.42</div>
-            </div>
-            <div class="pv-slot">
-              <div class="pv-avatar physical">N</div>
-              <div class="pv-name">Natasha</div>
-              <div class="pv-lv">Lv.38</div>
+
+        <div class="route">
+          <div class="route-line"></div>
+
+          <div class="stop"><div class="stop-num">01</div><div class="stop-body">
+            <h3>Party Management</h3>
+            <p>Build your 4-member team, equip light cones, manage relics, and swap characters on the fly.</p>
+            <span class="stop-tag">Core System</span>
+          </div></div>
+
+          <div class="stop"><div class="stop-num">02</div><div class="stop-body">
+            <h3>Turn-Based Combat</h3>
+            <p>Full turn-based combat with weaknesses, toughness breaks, skills, and ultimates.</p>
+            <span class="stop-tag">Core System</span>
+          </div></div>
+
+          <div class="stop"><div class="stop-num">03</div><div class="stop-body">
+            <h3>World Exploration</h3>
+            <p>Navigate locations, gather resources, discover hidden nodes, and complete deliveries.</p>
+            <span class="stop-tag">Overworld</span>
+          </div></div>
+
+          <div class="stop"><div class="stop-num">04</div><div class="stop-body">
+            <h3>Warp System</h3>
+            <p>Pull on standard and limited banners with pity tracking, stellar jade, and warp history.</p>
+            <span class="stop-tag">Gacha</span>
+          </div></div>
+
+          <div class="stop"><div class="stop-num">05</div><div class="stop-body">
+            <h3>Daily Missions</h3>
+            <p>Auto-assigned daily commissions with crafting, exploration, delivery, and gathering objectives.</p>
+            <span class="stop-tag">Progression</span>
+          </div></div>
+
+          <div class="stop"><div class="stop-num">06</div><div class="stop-body">
+            <h3>Astral Express</h3>
+            <p>Upgrade rooms, craft items, manage storage, and forge relics aboard the Express.</p>
+            <span class="stop-tag">Home Base</span>
+          </div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DEEP DIVES / PROJECTS -->
+    <section class="section" id="projects">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div>
+            <div class="section-eyebrow">Under the Hood</div>
+            <h2 class="section-title">Built for depth, not just decoration.</h2>
+          </div>
+          <div class="section-note">Three systems, expanded.</div>
+        </div>
+
+        <!-- Party -->
+        <div class="deep reveal">
+          <div>
+            <div class="deep-eyebrow">System 01 — Party</div>
+            <h3 class="deep-title">Assemble your dream team.</h3>
+            <p class="deep-desc">11 unique characters across 7 paths. Equip light cones, assign relics with set bonuses, and optimize stats. Your party, your strategy.</p>
+            <ul class="deep-list">
+              <li>4-member team with role diversity</li>
+              <li>Light cone equipment with passives</li>
+              <li>Relic sets with 2pc and 4pc bonuses</li>
+              <li>Character level and trace progression</li>
+            </ul>
+          </div>
+          <div class="panel">
+            <div class="panel-title"><span>Active Roster</span><span>4/4</span></div>
+            <div class="roster">
+              <div class="roster-card">
+                <div class="roster-top"><span class="roster-avatar" style="background:var(--accent-red)">H</span><span class="roster-name">Hook</span><span class="roster-lv">Lv.40</span></div>
+                <div class="bar-track"><div class="bar-fill" style="width:80%; background:var(--accent-red);"></div></div>
+              </div>
+              <div class="roster-card">
+                <div class="roster-top"><span class="roster-avatar" style="background:var(--accent-teal)">M</span><span class="roster-name">March 7th</span><span class="roster-lv">Lv.35</span></div>
+                <div class="bar-track"><div class="bar-fill" style="width:70%; background:var(--accent-teal);"></div></div>
+              </div>
+              <div class="roster-card">
+                <div class="roster-top"><span class="roster-avatar" style="background:var(--accent-purple)">D</span><span class="roster-name">Dan Heng</span><span class="roster-lv">Lv.42</span></div>
+                <div class="bar-track"><div class="bar-fill" style="width:84%; background:var(--accent-purple);"></div></div>
+              </div>
+              <div class="roster-card">
+                <div class="roster-top"><span class="roster-avatar" style="background:var(--accent-gold)">N</span><span class="roster-name">Natasha</span><span class="roster-lv">Lv.38</span></div>
+                <div class="bar-track"><div class="bar-fill" style="width:76%; background:var(--accent-gold);"></div></div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
-  </section>
 
-  <!-- DEEP DIVE: Combat -->
-  <section class="landing-section landing-dual reverse">
-    <div class="section-inner">
-      <div class="dual-row">
-        <div class="dual-visual">
-          <div class="visual-card combat-visual">
-            <div class="cv-bar">
-              <div class="cv-bar-label">Toughness</div>
-              <div class="cv-bar-track"><div class="cv-bar-fill" style="width:65%"></div></div>
-            </div>
-            <div class="cv-bar">
-              <div class="cv-bar-label">HP</div>
-              <div class="cv-bar-track hp"><div class="cv-bar-fill hp" style="width:80%"></div></div>
-            </div>
-            <div class="cv-enemy">
-              <span class="cv-enemy-name">Voidranger Reaver</span>
-              <span class="cv-enemy-weak">Weak: Fire, Wind</span>
+        <!-- Combat -->
+        <div class="deep reverse reveal">
+          <div>
+            <div class="deep-eyebrow">System 02 — Combat</div>
+            <h3 class="deep-title">Tactical, weakness-driven battles.</h3>
+            <p class="deep-desc">Engage 22+ enemy types across 4 zones. Exploit weaknesses, break toughness, and unleash devastating ultimates.</p>
+            <ul class="deep-list">
+              <li>7 elemental types with weakness system</li>
+              <li>Toughness breaks and weakness exploitation</li>
+              <li>Elite and boss encounters</li>
+              <li>Loot drops and material farming</li>
+            </ul>
+          </div>
+          <div class="panel">
+            <div class="panel-title"><span>Encounter</span><span>Zone 03</span></div>
+            <div class="combat-target">
+              <div class="combat-name-row"><span class="combat-name">Voidranger: Reaver</span><span class="combat-weak">WEAK: FIRE, WIND</span></div>
+              <div class="hp-label"><span>Toughness</span><span>3/5</span></div>
+              <div class="toughness-track">
+                <div class="toughness-seg"></div><div class="toughness-seg"></div><div class="toughness-seg"></div>
+                <div class="toughness-seg empty"></div><div class="toughness-seg empty"></div>
+              </div>
+              <div class="hp-label"><span>HP</span><span>62%</span></div>
+              <div class="bar-track"><div class="bar-fill" style="width:62%; background:var(--accent-red);"></div></div>
             </div>
           </div>
         </div>
-        <div class="dual-text">
-          <h3>Turn-Based Combat</h3>
-          <p>Engage in tactical battles against 22+ enemy types across 4 zones. Exploit weaknesses, break toughness, and unleash devastating ultimates.</p>
-          <ul class="dual-list">
-            <li>7 elemental types with weakness system</li>
-            <li>Toughness breaks and weakness exploitation</li>
-            <li>Elite and boss encounters</li>
-            <li>Loot drops and material farming</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </section>
 
-  <!-- DEEP DIVE: Warp -->
-  <section class="landing-section landing-dual">
-    <div class="section-inner">
-      <div class="dual-row">
-        <div class="dual-text">
-          <h3>Warp System</h3>
-          <p>Pull for characters and light cones with a full gacha system. Track your pity, manage stellar jades, and review your complete warp history.</p>
-          <ul class="dual-list">
-            <li>Standard and limited banners</li>
-            <li>Pity counter with guaranteed pulls</li>
-            <li>Warp history with session tracking</li>
-            <li>Stellar jade and wish management</li>
-          </ul>
-        </div>
-        <div class="dual-visual">
-          <div class="visual-card warp-visual">
-            <div class="wv-banner">
-              <div class="wv-banner-label">Character Event Warp</div>
-              <div class="wv-banner-name">From the Searing Storm</div>
+        <!-- Warp -->
+        <div class="deep reveal">
+          <div>
+            <div class="deep-eyebrow">System 03 — Warp</div>
+            <h3 class="deep-title">Pull, track, and manage your pity.</h3>
+            <p class="deep-desc">A full gacha system for characters and light cones. Track your pity, manage stellar jades, and review your complete warp history.</p>
+            <ul class="deep-list">
+              <li>Standard and limited banners</li>
+              <li>Pity counter with guaranteed pulls</li>
+              <li>Warp history with session tracking</li>
+              <li>Stellar jade and wish management</li>
+            </ul>
+          </div>
+          <div class="panel">
+            <div class="panel-title"><span>Character Event Warp</span><span>Live</span></div>
+            <div class="pity-ring-wrap">
+              <div>
+                <div class="pity-num">62<span class="pity-max">/90</span></div>
+                <div class="pity-sub">PITY COUNTER</div>
+              </div>
             </div>
-            <div class="wv-pity">
-              <span>Pity: 62/90</span>
-              <div class="cv-bar-track"><div class="cv-bar-fill pity" style="width:69%"></div></div>
-            </div>
+            <div class="warp-bar-track"><div class="warp-bar-fill" style="width:69%;"></div></div>
+            <div class="banner-name">From the Searing Storm</div>
           </div>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- CTA -->
-  <section class="landing-section landing-cta">
-    <div class="section-inner">
-      <h2>Ready to start your journey?</h2>
-      <p>Add ProbeBot to your server and explore the Herta Space Station.</p>
-      <div class="cta-actions">
-        <a href="https://discord.com/oauth2/authorize?client_id=1122198237542101103&scope=bot&permissions=8" class="landing-btn-primary lg" target="_blank" rel="noopener">Add to Discord</a>
-        <a href="/login" class="landing-btn-ghost lg">Open Dashboard</a>
+    <!-- CTA -->
+    <section class="cta-section reveal">
+      <div class="wrap">
+        <h2 class="cta-title">Ready to start your journey?</h2>
+        <p class="cta-desc">Add ProbeBot to your server and explore the Herta Space Station — the first stop is free.</p>
+        <div class="cta-actions">
+          <a href="https://discord.com/oauth2/authorize?client_id=1122198237542101103&scope=bot&permissions=8" class="btn btn-primary btn-lg" target="_blank" rel="noopener">Add to Discord</a>
+          <a href="/login" class="btn btn-ghost btn-lg">Open Dashboard</a>
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
+  </main>
 
   <!-- FOOTER -->
-  <footer class="landing-footer">
-    <div class="footer-inner">
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
       <div class="footer-top">
         <div class="footer-brand">
-          <img src="/ProbeBotPfpBlackAndWhite.png" alt="ProbeBot" class="footer-logo-img">
+          <img src="/ProbeBotPfpBlackAndWhite.png" alt="ProbeBot" class="footer-pfp">
           <span>ProbeBot</span>
         </div>
       </div>
