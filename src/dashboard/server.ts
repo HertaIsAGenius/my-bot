@@ -10,6 +10,10 @@ import {
   getChannelLogConfig, setLogConfig, setChannelLogConfig,
   enableSlowmodeChannel, disableSlowmodeChannel,
 } from '../utils/db';
+import {
+  getPlayerRoster, getPlayerRelics, getCharacterLightCone, getCharacterRelics,
+  getHsrStats,
+} from '../hsr/db';
 
 const app = express();
 const PORT = parseInt(process.env.DASHBOARD_PORT || '3000', 10);
@@ -379,6 +383,95 @@ app.post('/:guildId/modchannel', authRequired, (req, res) => {
     setTicketMeta(guildId, { moderatorChannel: null });
   }
   res.redirect(`/${guildId}/modchannel`);
+});
+
+// ── HSR Tracker ──
+
+app.get('/tracker', authRequired, async (req, res) => {
+  const session = (req as any).session;
+  res.render('tracker', { user: session });
+});
+
+app.get('/api/hsr/tracker', authRequired, async (req, res) => {
+  const userId = (req as any).session.userId;
+  const slot = parseInt(req.query.slot as string) || 1;
+  try {
+    const { default: Database } = await import('better-sqlite3');
+    const dbPath = join(process.cwd(), 'data', 'hsr.db');
+    const db = new Database(dbPath, { readonly: true });
+
+    const player = db.prepare('SELECT * FROM hsr_players WHERE user_id = ? AND slot_number = ?').get(userId, slot) as any;
+    const saveSlot = db.prepare('SELECT * FROM hsr_save_slots WHERE user_id = ? AND slot_number = ?').get(userId, slot) as any;
+    const roster = getPlayerRoster(userId, slot);
+
+    const rosterWithGear = roster.map((char: any) => {
+      const lc = getCharacterLightCone(userId, slot, char.character_id);
+      const relics = getCharacterRelics(userId, slot, char.character_id);
+      return { ...char, light_cone: lc || null, relics };
+    });
+
+    const allRelics = getPlayerRelics(userId, slot);
+
+    const inventory = db.prepare(`
+      SELECT i.*, m.name, m.type, m.rarity, m.description, m.source
+      FROM hsr_inventory i
+      LEFT JOIN hsr_materials m ON i.item_id = m.item_id
+      WHERE i.user_id = ? AND i.slot_number = ?
+      ORDER BY m.rarity DESC, m.name ASC
+    `).all(userId, slot) as any[];
+
+    const express = db.prepare(`
+      SELECT pe.*, er.name, er.description, er.max_level, er.base_production
+      FROM hsr_player_express pe
+      LEFT JOIN hsr_express_rooms er ON pe.room_id = er.room_id
+      WHERE pe.user_id = ? AND pe.slot_number = ?
+    `).all(userId, slot) as any[];
+
+    const quests = db.prepare(`
+      SELECT pq.*, q.title, q.description, q.quest_type, q.objectives
+      FROM hsr_player_quests pq
+      LEFT JOIN hsr_quests q ON pq.quest_id = q.id
+      WHERE pq.user_id = ? AND pq.slot_number = ?
+      ORDER BY pq.status ASC, q.display_order ASC
+    `).all(userId, slot) as any[];
+
+    const dailies = db.prepare(`
+      SELECT pd.*, dc.description, dc.commission_type, dc.rewards
+      FROM hsr_player_dailies pd
+      LEFT JOIN hsr_daily_commissions dc ON pd.commission_id = dc.id
+      WHERE pd.user_id = ? AND pd.slot_number = ? AND pd.date = date('now')
+    `).all(userId, slot) as any[];
+
+    const slots = db.prepare('SELECT * FROM hsr_save_slots WHERE user_id = ? ORDER BY slot_number').all(userId) as any[];
+
+    const achievements = db.prepare(`
+      SELECT pa.*, a.name, a.description, a.category
+      FROM hsr_player_achievements pa
+      LEFT JOIN hsr_achievements a ON pa.achievement_id = a.id
+      WHERE pa.user_id = ? AND pa.slot_number = ?
+    `).all(userId, slot) as any[];
+
+    const unlockedCount = achievements.filter((a: any) => a.unlocked).length;
+
+    db.close();
+
+    res.json({
+      success: true,
+      player: player || null,
+      saveSlot: saveSlot || null,
+      slots,
+      roster: rosterWithGear,
+      allRelics,
+      inventory,
+      express,
+      quests,
+      dailies,
+      achievements: { total: achievements.length, unlocked: unlockedCount },
+    });
+  } catch (err: any) {
+    console.error('[Tracker API Error]', err.message);
+    res.json({ success: false, error: err.message });
+  }
 });
 
 app.listen(PORT, () => {

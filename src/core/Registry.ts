@@ -28,7 +28,9 @@ function matchPattern(pattern: string | RegExp, value: string): boolean {
 async function safeHandle<T>(handler: (i: T) => Promise<void> | void, interaction: T, label: string): Promise<void> {
   try {
     await handler(interaction);
-  } catch (error) {
+  } catch (error: any) {
+    const code = error?.code ?? error?.httpStatus;
+    if (code === 40060 || code === 10062) return;
     console.error(`[Registry] ${label} handler error (${(interaction as any).customId ?? (interaction as any).commandName ?? ''}):`, error);
   }
 }

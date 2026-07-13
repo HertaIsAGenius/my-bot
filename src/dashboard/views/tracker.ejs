@@ -1,0 +1,54 @@
+<%- include('header', { title: 'HSR Tracker', active: 'tracker' }) %>
+
+<div class="tracker-container">
+  <div class="tracker-header">
+    <div class="tracker-title-row">
+      <h1 class="tracker-title">HSR Live Tracker</h1>
+      <div class="tracker-live-badge"><span class="tl-dot"></span> Live</div>
+    </div>
+    <div class="tracker-slot-bar">
+      <span class="tracker-slot-label">Save Slot:</span>
+      <div class="tracker-slot-btns" id="slotBtns"></div>
+    </div>
+  </div>
+
+  <div class="tracker-loading" id="trackerLoading">
+    <div class="tl-spinner"></div>
+    <span>Loading save data...</span>
+  </div>
+
+  <div class="tracker-empty" id="trackerEmpty" style="display:none;">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.3"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+    <p>No save data found. Start playing with <code>/hsr begin</code> in Discord first.</p>
+  </div>
+
+  <div class="tracker-content" id="trackerContent" style="display:none;">
+
+    <!-- PLAYER BAR -->
+    <div class="t-player-bar" id="playerBar"></div>
+
+    <!-- TABS -->
+    <div class="t-tabs">
+      <button class="t-tab active" data-tab="roster">Roster</button>
+      <button class="t-tab" data-tab="inventory">Inventory</button>
+      <button class="t-tab" data-tab="express">Express</button>
+      <button class="t-tab" data-tab="story">Story</button>
+    </div>
+
+    <!-- ROSTER TAB -->
+    <div class="t-panel" id="tab-roster"></div>
+
+    <!-- INVENTORY TAB -->
+    <div class="t-panel" id="tab-inventory" style="display:none;"></div>
+
+    <!-- EXPRESS TAB -->
+    <div class="t-panel" id="tab-express" style="display:none;"></div>
+
+    <!-- STORY TAB -->
+    <div class="t-panel" id="tab-story" style="display:none;"></div>
+
+  </div>
+</div>
+
+<script src="/tracker.js"></script>
+<%- include('footer') %>
