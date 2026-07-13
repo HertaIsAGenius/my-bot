@@ -189,9 +189,13 @@ function registerAllHandlers() {
   const hsrWarpCmd: CmdMod = require('./commands/hsr_warp');
   registry.registerButton('hsr_warp', (i) => hsrWarpCmd.handleHsrWarp(i));
   registry.registerButton(/^hsr_warp_pull_/, (i) => hsrWarpCmd.handleHsrWarpPull(i));
+  registry.registerButton(/^hsr_warp_usejades_/, (i) => hsrWarpCmd.handleHsrWarpUseJades(i));
   registry.registerButton(/^hsr_warp_history_/, (i) => hsrWarpCmd.handleHsrWarpHistory(i));
+  registry.registerButton(/^hsr_warp_info_/, (i) => hsrWarpCmd.handleHsrWarpInfo(i));
   registry.registerButton('hsr_warp_shop', (i) => hsrWarpCmd.handleHsrWarpShop(i));
-  registry.registerButton(/^hsr_warp_buy_/, (i) => hsrWarpCmd.handleHsrWarpBuy(i));
+  registry.registerButton('hsr_warp_shop_modal_standard', (i) => i.showModal(hsrWarpCmd.handleShopModalStandard(i)));
+  registry.registerButton('hsr_warp_shop_modal_limited', (i) => i.showModal(hsrWarpCmd.handleShopModalLimited(i)));
+  registry.registerModal(/^hsr_warp_shop_submit_/, (i) => hsrWarpCmd.handleShopSubmit(i));
 
   // HSR express
   const hsrExpressCmd: CmdMod = require('./commands/hsr_express');
@@ -215,11 +219,13 @@ function registerAllHandlers() {
   // HSR team & relic management
   const hsrTeamCmd: CmdMod = require('./commands/hsr_team');
   registry.registerButton('hsr_team', (i) => hsrTeamCmd.handleHsrTeam(i));
-  registry.registerSelectMenu('hsr_team_select', (i) => hsrTeamCmd.handleHsrTeamSelect(i));
-  registry.registerButton(/^hsr_team_assign_/, (i) => hsrTeamCmd.handleHsrTeamAssign(i));
+  registry.registerButton('hsr_team_roster_close', (i) => hsrTeamCmd.handleHsrTeamRosterClose(i));
+  registry.registerButton(/^hsr_team_roster_page_/, (i) => hsrTeamCmd.handleHsrTeamRosterPage(i));
+  registry.registerButton(/^hsr_team_roster_/, (i) => hsrTeamCmd.handleHsrTeamRoster(i));
+  registry.registerSelectMenu(/^hsr_team_roster_menu_/, (i) => hsrTeamCmd.handleHsrTeamRosterSelect(i));
+  registry.registerButton(/^hsr_team_char_/, (i) => hsrTeamCmd.handleHsrTeamCharInfo(i));
   registry.registerButton(/^hsr_team_remove_/, (i) => hsrTeamCmd.handleHsrTeamRemove(i));
-  registry.registerButton(/^hsr_relic_view_/, (i) => hsrTeamCmd.handleHsrRelicView(i));
-  registry.registerSelectMenu(/^hsr_relic_equip_/, (i) => hsrTeamCmd.handleHsrRelicEquip(i));
+  registry.registerButton(/^hsr_team_lc_info_/, (i) => hsrTeamCmd.handleHsrTeamLcInfo(i));
 
   // Reaction Roles
   registry.registerSelectMenu(/^rr_sel_/, async (i) => {

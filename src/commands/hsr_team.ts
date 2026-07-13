@@ -1,22 +1,35 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize } from 'discord.js';
-import { embed, embedColored, COLORS } from '../utils/embed';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } from 'discord.js';
 import {
   getSaveSlots, getPlayer, getPlayerRoster, getParty,
-  setPartySlot, unequipCharacter,
-  getPlayerRelics, getCharacterRelics, equipRelic, unequipRelic, getRelicById,
+  setPartySlot, unequipCharacter, getCharacterLightCone,
 } from '../hsr/db';
-
-const ELEMENT_EMOJI: Record<string, string> = {
-  physical: '⚔️', fire: '🔥', ice: '❄️', lightning: '⚡',
-  wind: '🌪️', quantum: '🕳️', imaginary: '✨',
-};
 
 const RARITY_STARS: Record<number, string> = { 5: '★★★★★', 4: '★★★★' };
 
-const PIECE_LABELS: Record<string, string> = {
-  head: 'Head', hands: 'Hands', body: 'Body', feet: 'Feet',
-  planar_sphere: 'Planar Sphere', link_rope: 'Link Rope',
-};
+const BAR_EMPTY_START = '<:LoadBarEmpty1:1523289923799482409>';
+const BAR_FILLED_START = '<:LoadBar1:1523277881164435506>';
+const BAR_EMPTY_MID = '<:LoadBarEmpty2:1523290039872917574>';
+const BAR_FILLED_MID = '<:LoadBar2:1523278877533929593>';
+const BAR_EMPTY_END = '<:LoadBarEmpty3:1523290155622862889>';
+const BAR_ALMOST_END = '<:LoadBar4:1523278813176397944>';
+const BAR_FULL_END = '<:loadbarfull4:1525944079219691581>';
+
+function getLoadBar(current: number, max: number): string {
+  const pct = max > 0 ? (current / max) * 100 : 0;
+  const start = pct > 5 ? BAR_FILLED_START : BAR_EMPTY_START;
+  let filledMids: number;
+  let end: string;
+  if (pct <= 5)       { filledMids = 0; end = BAR_EMPTY_END; }
+  else if (pct <= 19) { filledMids = 0; end = BAR_EMPTY_END; }
+  else if (pct <= 30) { filledMids = 1; end = BAR_EMPTY_END; }
+  else if (pct <= 49) { filledMids = 2; end = BAR_EMPTY_END; }
+  else if (pct <= 65) { filledMids = 3; end = BAR_EMPTY_END; }
+  else if (pct <= 84) { filledMids = 4; end = BAR_ALMOST_END; }
+  else                { filledMids = 4; end = BAR_FULL_END; }
+  return start + BAR_FILLED_MID.repeat(filledMids) + BAR_EMPTY_MID.repeat(4 - filledMids) + end;
+}
+
+const CHARS_PER_PAGE = 4;
 
 function getLatestSlot(userId: string): number | null {
   const slots = getSaveSlots(userId);
@@ -25,71 +38,73 @@ function getLatestSlot(userId: string): number | null {
   return slots[0].slot_number;
 }
 
-// ── Team View ──
+function errContainer(msg: string): ContainerBuilder {
+  return new ContainerBuilder()
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Error'))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(msg))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+    .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+    ));
+}
+
+// ── Party Setup ──
 
 export async function handleHsrTeam(interaction: any) {
   const userId = interaction.user.id;
   const slot = getLatestSlot(userId);
   if (!slot) {
-    await interaction.reply({ embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')], flags: MessageFlags.Ephemeral });
+    await interaction.update({ components: [errContainer('Use `/hsr begin` to create your Trailblazer first.')], flags: MessageFlags.IsComponentsV2 });
     return;
   }
 
-  const container = buildTeamContainer(userId, slot);
-  await interaction.reply({
-    components: [container],
-    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
-  });
+  const container = buildPartySetup(userId, slot);
+  await interaction.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
 }
 
-function buildTeamContainer(userId: string, slot: number): ContainerBuilder {
+function buildPartySetup(userId: string, slot: number): ContainerBuilder {
   const party = getParty(userId, slot);
-  const roster = getPlayerRoster(userId, slot);
 
   const container = new ContainerBuilder()
     .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Party Setup'))
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
 
-  // Party slots
-  const slots = [1, 2, 3, 4];
-  for (const s of slots) {
+  for (let s = 1; s <= 4; s++) {
     const char = party.find((c: any) => c.party_slot === s);
     if (char) {
-      const ele = ELEMENT_EMOJI[char.element] ?? '❓';
       const stars = RARITY_STARS[char.rarity] ?? '';
       container.addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(`**Slot ${s}:** ${ele} ${stars} **${char.name}** — Lv.${char.level} · ${char.path}`),
+        new TextDisplayBuilder().setContent(`**Character ${s}:** ${char.name} ${stars}`),
+      );
+      container.addActionRowComponents(
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`hsr_team_char_${char.character_id}`)
+            .setLabel('View Character')
+            .setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder()
+            .setCustomId(`hsr_team_remove_${char.character_id}`)
+            .setLabel('Remove Character')
+            .setStyle(ButtonStyle.Danger),
+        ),
       );
     } else {
       container.addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(`**Slot ${s}:** *Empty*`),
+        new TextDisplayBuilder().setContent(`**Character ${s}:** Empty`),
+      );
+      container.addActionRowComponents(
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`hsr_team_roster_${s}`)
+            .setLabel('Add Character')
+            .setStyle(ButtonStyle.Primary),
+        ),
       );
     }
-  }
-
-  // Roster select menu
-  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent('## Roster'));
-
-  const rosterOptions = roster.map((c: any) => {
-    const ele = ELEMENT_EMOJI[c.element] ?? '❓';
-    const stars = RARITY_STARS[c.rarity] ?? '';
-    const equippedLabel = c.equipped ? ` [Slot ${c.party_slot}]` : '';
-    return new StringSelectMenuOptionBuilder()
-      .setLabel(`${c.name}${equippedLabel}`)
-      .setDescription(`${ele} Lv.${c.level} · ${c.path}`)
-      .setValue(c.character_id);
-  }).slice(0, 25);
-
-  if (rosterOptions.length > 0) {
-    container.addActionRowComponents(
-      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-        new StringSelectMenuBuilder()
-          .setCustomId('hsr_team_select')
-          .setPlaceholder('Select a character to manage...')
-          .addOptions(rosterOptions),
-      ),
-    );
+    if (s < 4) {
+      container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+    }
   }
 
   container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
@@ -102,256 +117,223 @@ function buildTeamContainer(userId: string, slot: number): ContainerBuilder {
   return container;
 }
 
-// ── Character Detail View ──
+// ── Roster View (ephemeral, paginated select menu) ──
 
-export async function handleHsrTeamSelect(interaction: any) {
-  const userId = interaction.user.id;
-  const slot = getLatestSlot(userId);
-  if (!slot) {
-    await interaction.reply({ embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')], flags: MessageFlags.Ephemeral });
-    return;
-  }
-
-  const charId = interaction.values[0];
-  const container = buildCharacterDetail(userId, slot, charId);
-  await interaction.reply({
-    components: [container],
-    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
-  });
+function getSortedRoster(userId: string, slot: number): any[] {
+  const roster = getPlayerRoster(userId, slot);
+  return [...roster].sort((a: any, b: any) => a.name.localeCompare(b.name));
 }
 
-function buildCharacterDetail(userId: string, slot: number, charId: string): ContainerBuilder {
-  const roster = getPlayerRoster(userId, slot);
-  const char = roster.find((c: any) => c.character_id === charId);
-  if (!char) {
-    return new ContainerBuilder()
-      .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Character Not Found'));
-  }
-
-  const ele = ELEMENT_EMOJI[char.element] ?? '❓';
-  const stars = RARITY_STARS[char.rarity] ?? '';
-  const equippedLabel = char.equipped ? ` — **Party Slot ${char.party_slot}**` : ' — *Not in party*';
+function buildRosterPage(userId: string, slot: number, targetSlot: number, page: number): ContainerBuilder {
+  const sorted = getSortedRoster(userId, slot);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / CHARS_PER_PAGE));
+  const safePage = Math.min(Math.max(0, page), totalPages - 1);
+  const start = safePage * CHARS_PER_PAGE;
+  const chars = sorted.slice(start, start + CHARS_PER_PAGE);
 
   const container = new ContainerBuilder()
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# ${char.name}`))
-    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`${ele} ${stars} · ${char.path}${equippedLabel}`))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`Lv.${char.level} · HP ${char.base_hp} · ATK ${char.base_atk} · DEF ${char.base_def} · SPD ${char.base_speed}`))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# Unlocked Character Menu (page ${safePage + 1} of ${totalPages})`))
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
 
-  // Relics on this character
-  const relics = getCharacterRelics(userId, slot, charId);
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent('## Relics'));
+  const options = chars.map((char: any) => {
+    const stars = RARITY_STARS[char.rarity] ?? '';
+    return new StringSelectMenuOptionBuilder()
+      .setLabel(`${stars} ${char.name}`)
+      .setDescription(`${char.path} · ${char.element}`)
+      .setValue(char.character_id);
+  });
 
-  const equippedRelics = new Map(relics.map((r: any) => [r.piece_type, r]));
-  for (const pieceType of ['head', 'hands', 'body', 'feet', 'planar_sphere', 'link_rope']) {
-    const relic = equippedRelics.get(pieceType);
-    const label = PIECE_LABELS[pieceType] ?? pieceType;
-    if (relic) {
-      container.addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(`• **${label}:** ${relic.set_name} (Lv.${relic.level})`),
-      );
-    } else {
-      container.addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(`• **${label}:** *Empty*`),
-      );
-    }
+  container.addActionRowComponents(
+    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(`hsr_team_roster_menu_${targetSlot}_${safePage}`)
+        .setPlaceholder('Select a character...')
+        .addOptions(options),
+    ),
+  );
+
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+
+  const navButtons: ButtonBuilder[] = [];
+  if (safePage > 0) {
+    navButtons.push(
+      new ButtonBuilder()
+        .setCustomId(`hsr_team_roster_page_${targetSlot}_${safePage - 1}`)
+        .setLabel('← Previous')
+        .setStyle(ButtonStyle.Secondary),
+    );
+  }
+  if (safePage < totalPages - 1) {
+    navButtons.push(
+      new ButtonBuilder()
+        .setCustomId(`hsr_team_roster_page_${targetSlot}_${safePage + 1}`)
+        .setLabel('Next →')
+        .setStyle(ButtonStyle.Secondary),
+    );
   }
 
-  // Party assignment buttons
-  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent('## Party Assignment'));
-
-  const buttons: ButtonBuilder[] = [];
-  if (!char.equipped) {
-    // Find first empty slot
-    const party = getParty(userId, slot);
-    const usedSlots = party.map((c: any) => c.party_slot);
-    for (let s = 1; s <= 4; s++) {
-      if (!usedSlots.includes(s)) {
-        buttons.push(new ButtonBuilder()
-          .setCustomId(`hsr_team_assign_${charId}_${s}`)
-          .setLabel(`Assign to Slot ${s}`)
-          .setStyle(ButtonStyle.Success));
-        break;
-      }
-    }
-    if (party.length < 4 && buttons.length === 0) {
-      buttons.push(new ButtonBuilder()
-        .setCustomId(`hsr_team_assign_${charId}_auto`)
-        .setLabel('Add to Party')
-        .setStyle(ButtonStyle.Success));
-    }
-  } else {
-    buttons.push(new ButtonBuilder()
-      .setCustomId(`hsr_team_remove_${charId}`)
-      .setLabel('Remove from Party')
-      .setStyle(ButtonStyle.Danger));
+  if (navButtons.length > 0) {
+    container.addActionRowComponents(
+      new ActionRowBuilder<ButtonBuilder>().addComponents(...navButtons),
+    );
   }
 
-  if (buttons.length > 0) {
-    container.addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons));
-  }
-
-  // Relic equip button
   container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
     .addActionRowComponents(
       new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId(`hsr_relic_view_${charId}`).setLabel('Manage Relics').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('hsr_team').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('hsr_team_roster_close').setLabel('Back').setStyle(ButtonStyle.Secondary),
       ),
     );
 
   return container;
 }
 
-// ── Party Assignment ──
-
-export async function handleHsrTeamAssign(interaction: any) {
+export async function handleHsrTeamRoster(interaction: any) {
   const userId = interaction.user.id;
   const slot = getLatestSlot(userId);
   if (!slot) {
-    await interaction.reply({ embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')], flags: MessageFlags.Ephemeral });
+    await interaction.reply({
+      components: [errContainer('Use `/hsr begin` to create your Trailblazer first.')],
+      flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+    });
     return;
   }
 
   const parts = interaction.customId.split('_');
-  const charId = parts[3];
-  const slotNum = parts[4];
-
-  if (slotNum === 'auto') {
-    const party = getParty(userId, slot);
-    const usedSlots = party.map((c: any) => c.party_slot);
-    let nextSlot = 1;
-    for (let s = 1; s <= 4; s++) {
-      if (!usedSlots.includes(s)) { nextSlot = s; break; }
-    }
-    setPartySlot(userId, slot, charId, nextSlot);
-  } else {
-    setPartySlot(userId, slot, charId, parseInt(slotNum));
-  }
-
-  const container = buildTeamContainer(userId, slot);
-  await interaction.update({
+  const targetSlot = parseInt(parts[parts.length - 1], 10);
+  const container = buildRosterPage(userId, slot, targetSlot, 0);
+  await interaction.reply({
     components: [container],
+    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
   });
 }
+
+export async function handleHsrTeamRosterPage(interaction: any) {
+  const userId = interaction.user.id;
+  const slot = getLatestSlot(userId);
+  if (!slot) {
+    await interaction.update({ components: [errContainer('No save found.')], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
+    return;
+  }
+
+  const parts = interaction.customId.split('_');
+  const targetSlot = parseInt(parts[parts.length - 2], 10);
+  const page = parseInt(parts[parts.length - 1], 10);
+
+  const container = buildRosterPage(userId, slot, targetSlot, page);
+  await interaction.update({ components: [container], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
+}
+
+export async function handleHsrTeamRosterSelect(interaction: any) {
+  const userId = interaction.user.id;
+  const slot = getLatestSlot(userId);
+  if (!slot) {
+    await interaction.update({ components: [errContainer('No save found.')], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
+    return;
+  }
+
+  const parts = interaction.customId.split('_');
+  const targetSlot = parseInt(parts[parts.length - 2], 10);
+  const charId = interaction.values[0];
+
+  setPartySlot(userId, slot, charId, targetSlot);
+
+  const container = buildCharacterInfo(userId, slot, charId);
+  await interaction.update({ components: [container], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
+}
+
+export async function handleHsrTeamRosterClose(interaction: any) {
+  await interaction.message.delete().catch(() => {
+    interaction.update({ content: 'Roster closed.', components: [] }).catch(() => {});
+  });
+}
+
+// ── Character Info ──
+
+export async function handleHsrTeamCharInfo(interaction: any) {
+  const userId = interaction.user.id;
+  const slot = getLatestSlot(userId);
+  if (!slot) {
+    await interaction.update({ components: [errContainer('Use `/hsr begin` to create your Trailblazer first.')], flags: MessageFlags.IsComponentsV2 });
+    return;
+  }
+
+  const charId = interaction.customId.replace('hsr_team_char_', '');
+  const container = buildCharacterInfo(userId, slot, charId);
+  await interaction.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
+}
+
+function buildCharacterInfo(userId: string, slot: number, charId: string): ContainerBuilder {
+  const roster = getPlayerRoster(userId, slot);
+  const char = roster.find((c: any) => c.character_id === charId);
+  if (!char) {
+    return errContainer('Character not found.');
+  }
+
+  const stars = RARITY_STARS[char.rarity] ?? '';
+  const lightCone = getCharacterLightCone(userId, slot, charId);
+  const lcName = lightCone?.name ?? 'None';
+
+  return new ContainerBuilder()
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Character Information'))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`${char.name} ${stars}`))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent('**Character Level**'))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`${char.xp ?? 0}/${(char.level ?? 1) * 50} | ${Math.round(((char.xp ?? 0) / ((char.level ?? 1) * 50)) * 100)}% XP`))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(getLoadBar(char.xp ?? 0, (char.level ?? 1) * 50)))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent('**Character Light Cone:**'))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(lcName))
+    .addActionRowComponents(
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`hsr_team_lc_info_${charId}`)
+          .setLabel('Information')
+          .setStyle(ButtonStyle.Secondary),
+      ),
+    )
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent('## Eidolon(s)'))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent('E1 -\nE2 -\nE3 -\nE4 -\nE5 -\nE6 -'))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+    .addActionRowComponents(
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId('hsr_team').setLabel('Back').setStyle(ButtonStyle.Secondary),
+      ),
+    );
+}
+
+// ── Remove Character ──
 
 export async function handleHsrTeamRemove(interaction: any) {
   const userId = interaction.user.id;
   const slot = getLatestSlot(userId);
   if (!slot) {
-    await interaction.reply({ embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')], flags: MessageFlags.Ephemeral });
+    await interaction.update({ components: [errContainer('Use `/hsr begin` to create your Trailblazer first.')], flags: MessageFlags.IsComponentsV2 });
     return;
   }
 
-  const parts = interaction.customId.split('_');
-  const charId = parts[3];
+  const charId = interaction.customId.replace('hsr_team_remove_', '');
   unequipCharacter(userId, slot, charId);
 
-  const container = buildTeamContainer(userId, slot);
-  await interaction.update({ components: [container] });
+  const container = buildPartySetup(userId, slot);
+  await interaction.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
 }
 
-// ── Relic Management ──
+// ── Light Cone Info (placeholder, ephemeral) ──
 
-export async function handleHsrRelicView(interaction: any) {
-  const userId = interaction.user.id;
-  const slot = getLatestSlot(userId);
-  if (!slot) {
-    await interaction.reply({ embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')], flags: MessageFlags.Ephemeral });
-    return;
-  }
-
-  const parts = interaction.customId.split('_');
-  const charId = parts[3];
-  const container = buildRelicView(userId, slot, charId);
+export async function handleHsrTeamLcInfo(interaction: any) {
   await interaction.reply({
-    components: [container],
+    components: [new ContainerBuilder()
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Light Cone Information'))
+      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent('Detailed Light Cone information coming soon.'))
+      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+      .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId('hsr_team').setLabel('Back').setStyle(ButtonStyle.Secondary),
+      ))
+    ],
     flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
   });
-}
-
-function buildRelicView(userId: string, slot: number, charId: string): ContainerBuilder {
-  const roster = getPlayerRoster(userId, slot);
-  const char = roster.find((c: any) => c.character_id === charId);
-  const charName = char?.name ?? charId;
-  const equippedRelics = getCharacterRelics(userId, slot, charId);
-  const allRelics = getPlayerRelics(userId, slot);
-  const unequipped = allRelics.filter((r: any) => !r.character_id);
-
-  const container = new ContainerBuilder()
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# Relics — ${charName}`))
-    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
-
-  // Show equipped relics
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent('## Equipped'));
-  const equippedMap = new Map(equippedRelics.map((r: any) => [r.piece_type, r]));
-  for (const pieceType of ['head', 'hands', 'body', 'feet', 'planar_sphere', 'link_rope']) {
-    const relic = equippedMap.get(pieceType);
-    const label = PIECE_LABELS[pieceType] ?? pieceType;
-    if (relic) {
-      const stars = RARITY_STARS[relic.rarity] ?? '';
-      container.addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(`• **${label}:** ${stars} ${relic.set_name} Lv.${relic.level}`),
-      );
-    } else {
-      container.addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(`• **${label}:** *Empty*`),
-      );
-    }
-  }
-
-  // Show unequipped relics
-  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent('## Available Relics'));
-
-  if (unequipped.length === 0) {
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('No unequipped relics available.'));
-  } else {
-    const relicOptions = unequipped.slice(0, 25).map((r: any) => {
-      const stars = RARITY_STARS[r.rarity] ?? '';
-      const pieceLabel = PIECE_LABELS[r.piece_type] ?? r.piece_type;
-      return new StringSelectMenuOptionBuilder()
-        .setLabel(`${stars} ${r.set_name}`)
-        .setDescription(`${pieceLabel} · Lv.${r.level}`)
-        .setValue(String(r.id));
-    });
-
-    container.addActionRowComponents(
-      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-        new StringSelectMenuBuilder()
-          .setCustomId(`hsr_relic_equip_${charId}`)
-          .setPlaceholder('Select a relic to equip...')
-          .addOptions(relicOptions),
-      ),
-    );
-  }
-
-  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
-    .addActionRowComponents(
-      new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId(`hsr_team_select_${charId}`).setLabel('Back').setStyle(ButtonStyle.Secondary),
-      ),
-    );
-
-  return container;
-}
-
-export async function handleHsrRelicEquip(interaction: any) {
-  const userId = interaction.user.id;
-  const slot = getLatestSlot(userId);
-  if (!slot) {
-    await interaction.reply({ embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')], flags: MessageFlags.Ephemeral });
-    return;
-  }
-
-  const parts = interaction.customId.split('_');
-  const charId = parts[3];
-  const relicId = parseInt(interaction.values[0]);
-
-  equipRelic(userId, slot, relicId, charId);
-
-  const container = buildRelicView(userId, slot, charId);
-  await interaction.update({ components: [container] });
 }

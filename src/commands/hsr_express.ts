@@ -1,5 +1,4 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize, MediaGalleryBuilder, MediaGalleryItemBuilder, AttachmentBuilder } from 'discord.js';
-import { embed, embedColored, COLORS } from '../utils/embed';
 import {
   getSaveSlots, getPlayer, getPlayerExpress, getInventory,
   addItem, addCredits, removeItem,
@@ -9,7 +8,6 @@ import { incrementDailyObjective } from './hsr_dailies';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const LOADBAR = '<:LoadBarEmpty1:1523289923799482409><:LoadBarEmpty2:1523290039872917574><:LoadBarEmpty2:1523290039872917574><:LoadBarEmpty2:1523290039872917574><:LoadBarEmpty2:1523290039872917574><:LoadBarEmpty3:1523290155622862889>';
 const EXPRESS_IMAGE = join(process.cwd(), 'LanBot Sprites', 'Plain Room HSR.png');
 
 function getSlotData(userId: string): { slot: number; expressName: string } | null {
@@ -21,10 +19,8 @@ function getSlotData(userId: string): { slot: number; expressName: string } | nu
 
 function buildExpressContainer(rooms: any[], username: string, expressName: string, includeImage: boolean): { container: ContainerBuilder; attachment?: AttachmentBuilder } {
   const container = new ContainerBuilder()
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# ${username}'s ${expressName}`))
-    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent('## Astral Express Rooms'))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent('Each room offers a different utility for your Trailblazer journey.'));
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# ${username}'s Express`))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
 
   let attachment: AttachmentBuilder | undefined;
 
@@ -42,60 +38,82 @@ function buildExpressContainer(rooms: any[], username: string, expressName: stri
     }
   }
 
-  const roomSummary = rooms.map((r: any) => `• ${r.name} — Lv.${r.level}/${r.max_level}`).join('\n');
-  container
-    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent('## Room Overview'))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(roomSummary || 'No rooms available yet.'));
-
-  const roomButtons = rooms.map((r: any) => new ButtonBuilder()
-    .setCustomId(`hsr_express_room_${r.room_id}`)
-    .setLabel(r.name)
-    .setStyle(ButtonStyle.Secondary));
-
-  const buttonRows: ActionRowBuilder<ButtonBuilder>[] = [];
-  for (let i = 0; i < roomButtons.length; i += 5) {
-    buttonRows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(...roomButtons.slice(i, i + 5)));
-  }
-
-  if (buttonRows.length > 0) {
+  for (const room of rooms) {
     container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
-    container.addActionRowComponents(...buttonRows);
+
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${room.name}`));
+
+    const levelPct = room.max_level > 0 ? room.level / room.max_level : 0;
+    const filledBars = Math.round(levelPct * 5);
+    const loadbar = '■'.repeat(filledBars) + '□'.repeat(5 - filledBars);
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`Level ${room.level}/${room.max_level}`));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(loadbar));
+
+    const roomRef = getExpressRoom(room.room_id);
+    const costs = roomRef?.upgrade_costs ? JSON.parse(roomRef.upgrade_costs) : [];
+    const nextCost = costs.find((c: any) => c.level === room.level + 1);
+    if (nextCost) {
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`Upgrade(s) available: ${nextCost.credits.toLocaleString()} Credits`));
+    } else if (room.level >= room.max_level) {
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent('Max Level'));
+    }
+
+    container.addActionRowComponents(
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`hsr_express_room_${room.room_id}`)
+          .setLabel(room.name)
+          .setStyle(ButtonStyle.Secondary),
+      ),
+    );
   }
 
-  container.addActionRowComponents(
-    new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId('hsr_profile')
-        .setLabel('Back')
-        .setStyle(ButtonStyle.Secondary),
-    ),
-  );
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+    .addActionRowComponents(
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId('hsr_profile')
+          .setLabel('Back')
+          .setStyle(ButtonStyle.Secondary),
+      ),
+    );
 
   return { container, attachment };
 }
 
+function buildErrorContainer(title: string, message: string, backId: string = 'hsr_express'): ContainerBuilder {
+  return new ContainerBuilder()
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# ${title}`))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(message))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+    .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId(backId).setLabel('Back').setStyle(ButtonStyle.Secondary),
+    ));
+}
+
 export async function handleHsrExpress(interaction: any) {
+  await interaction.deferUpdate();
   const userId = interaction.user.id;
   const data = getSlotData(userId);
   if (!data) {
-    await interaction.reply({ embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')], flags: MessageFlags.Ephemeral });
+    await interaction.editReply({
+      components: [buildErrorContainer('No Save Found', 'Use `/hsr begin` to create your Trailblazer.', 'hsr_profile')],
+      flags: MessageFlags.IsComponentsV2,
+    });
     return;
   }
   const { slot, expressName } = data;
-
-  await interaction.deferUpdate();
 
   const rooms = getPlayerExpress(userId, slot);
   const username = interaction.user.username;
 
   const { container, attachment } = buildExpressContainer(rooms, username, expressName, true);
 
-  await interaction.followUp({
+  await interaction.editReply({
     components: [container],
     files: attachment ? [attachment] : [],
-    flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2,
-    withComponents: true,
+    flags: MessageFlags.IsComponentsV2,
   });
 }
 
@@ -104,7 +122,10 @@ export async function handleHsrExpressRoom(interaction: any) {
   const roomId = interaction.customId.replace('hsr_express_room_', '');
   const data = getSlotData(userId);
   if (!data) {
-    await interaction.reply({ embeds: [embed('No Save Found', 'Use `/hsr begin` first.')], flags: MessageFlags.Ephemeral });
+    await interaction.update({
+      components: [buildErrorContainer('No Save Found', 'Use `/hsr begin` first.', 'hsr_profile')],
+      flags: MessageFlags.IsComponentsV2,
+    });
     return;
   }
   const { slot } = data;
@@ -112,7 +133,10 @@ export async function handleHsrExpressRoom(interaction: any) {
   const rooms = getPlayerExpress(userId, slot);
   const room = rooms.find((r: any) => r.room_id === roomId);
   if (!room) {
-    await interaction.reply({ embeds: [embed('Room Not Found', 'This room does not exist on your Express.')], flags: MessageFlags.Ephemeral });
+    await interaction.update({
+      components: [buildErrorContainer('Room Not Found', 'This room does not exist on your Express.')],
+      flags: MessageFlags.IsComponentsV2,
+    });
     return;
   }
 
@@ -144,15 +168,21 @@ export async function handleHsrExpressRoom(interaction: any) {
     }
   }
 
+  const levelPct = room.max_level > 0 ? room.level / room.max_level : 0;
+  const filledBars = Math.round(levelPct * 5);
+  const loadbar = '■'.repeat(filledBars) + '□'.repeat(5 - filledBars);
+
   const container = new ContainerBuilder()
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# ${room.name} — Lv.${room.level}/${room.max_level}`))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# ${room.name}`))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`Level ${room.level}/${room.max_level}`))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(loadbar))
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
     .addTextDisplayComponents(new TextDisplayBuilder().setContent(room.description))
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
     .addTextDisplayComponents(new TextDisplayBuilder().setContent('## Starter Supplies'))
     .addTextDisplayComponents(new TextDisplayBuilder().setContent(starterLines.length > 0 ? starterLines.join('\n') : 'No starter supplies needed.'));
 
-  // Production display
   let prodStr = '';
   if (roomRef?.base_production) {
     try {
@@ -170,7 +200,6 @@ export async function handleHsrExpressRoom(interaction: any) {
 
   container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
 
-  // Upgrade info
   if (nextCost) {
     const costLines: string[] = [`Upgrade to Lv.${room.level + 1}: ${nextCost.credits.toLocaleString()} Credits`];
     if (nextCost.materials) {
@@ -185,7 +214,6 @@ export async function handleHsrExpressRoom(interaction: any) {
 
   container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
 
-  // Action buttons
   const buttons: ButtonBuilder[] = [];
 
   if (roomId === 'workshop') {
@@ -235,7 +263,7 @@ export async function handleHsrExpressRoom(interaction: any) {
     new ButtonBuilder()
       .setCustomId('hsr_express')
       .setLabel('Back')
-      .setStyle(ButtonStyle.Danger),
+      .setStyle(ButtonStyle.Secondary),
   );
 
   const rows: ActionRowBuilder<ButtonBuilder>[] = [];
@@ -244,9 +272,9 @@ export async function handleHsrExpressRoom(interaction: any) {
   }
   container.addActionRowComponents(...rows);
 
-  await interaction.reply({
+  await interaction.update({
     components: [container],
-    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+    flags: MessageFlags.IsComponentsV2,
   });
 }
 
@@ -255,14 +283,20 @@ export async function handleHsrExpressCraft(interaction: any) {
   const itemId = interaction.customId.replace('hsr_express_workshop_craft_', '');
   const data = getSlotData(userId);
   if (!data) {
-    await interaction.reply({ embeds: [embed('No Save Found', 'Use `/hsr begin` first.')], flags: MessageFlags.Ephemeral });
+    await interaction.update({
+      components: [buildErrorContainer('No Save Found', 'Use `/hsr begin` first.', 'hsr_profile')],
+      flags: MessageFlags.IsComponentsV2,
+    });
     return;
   }
   const { slot } = data;
 
   const player = getPlayer(userId, slot);
   if (!player) {
-    await interaction.reply({ embeds: [embed('Error', 'Save data not found.')], flags: MessageFlags.Ephemeral });
+    await interaction.update({
+      components: [buildErrorContainer('Error', 'Save data not found.')],
+      flags: MessageFlags.IsComponentsV2,
+    });
     return;
   }
 
@@ -270,9 +304,17 @@ export async function handleHsrExpressCraft(interaction: any) {
   const cost = costs[itemId] ?? 10;
   const label = itemId === 'travel_guide' ? 'Travel Guide' : 'Adventure\'s Log';
   if (player.credits < cost) {
-    await interaction.reply({
-      embeds: [embed('Insufficient Credits', `You need **${cost}** credits to craft **${label}**. You have **${player.credits}**.`)],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Insufficient Credits'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(`You need **${cost}** credits to craft **${label}**. You have **${player.credits}**.`))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_express').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
@@ -283,9 +325,17 @@ export async function handleHsrExpressCraft(interaction: any) {
   const { advanceQuest } = require('../hsr/db');
   advanceQuest(userId, slot, 'craft_items');
 
-  await interaction.reply({
-    embeds: [embedColored(COLORS.success, 'Item Crafted', `Successfully crafted **1 × ${label}** for **${cost}** credits.`)],
-    flags: MessageFlags.Ephemeral,
+  await interaction.update({
+    components: [new ContainerBuilder()
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Item Crafted'))
+      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(`Successfully crafted **1 × ${label}** for **${cost}** credits.`))
+      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+      .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId('hsr_express').setLabel('Back').setStyle(ButtonStyle.Secondary),
+      ))
+    ],
+    flags: MessageFlags.IsComponentsV2,
   });
 }
 
@@ -293,19 +343,41 @@ export async function handleHsrExpressForgeEnhance(interaction: any) {
   const userId = interaction.user.id;
   const data = getSlotData(userId);
   if (!data) {
-    await interaction.reply({ embeds: [embed('No Save Found', 'Use `/hsr begin` first.')], flags: MessageFlags.Ephemeral });
+    await interaction.update({
+      components: [buildErrorContainer('No Save Found', 'Use `/hsr begin` first.', 'hsr_profile')],
+      flags: MessageFlags.IsComponentsV2,
+    });
     return;
   }
   const { slot } = data;
 
   if (!removeItem(userId, slot, 'relic_fragment', 1)) {
-    await interaction.reply({ embeds: [embed('Missing Material', 'You need 1 Relic Fragment to enhance a relic.')], flags: MessageFlags.Ephemeral });
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Missing Material'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('You need 1 Relic Fragment to enhance a relic.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_express').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
+    });
     return;
   }
 
-  await interaction.reply({
-    embeds: [embedColored(COLORS.success, 'Relic Enhanced', 'Your starter relic was polished with 1 Relic Fragment.')],
-    flags: MessageFlags.Ephemeral,
+  await interaction.update({
+    components: [new ContainerBuilder()
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Relic Enhanced'))
+      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent('Your starter relic was polished with 1 Relic Fragment.'))
+      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+      .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId('hsr_express').setLabel('Back').setStyle(ButtonStyle.Secondary),
+      ))
+    ],
+    flags: MessageFlags.IsComponentsV2,
   });
 }
 
@@ -313,7 +385,10 @@ export async function handleHsrExpressStorageView(interaction: any) {
   const userId = interaction.user.id;
   const data = getSlotData(userId);
   if (!data) {
-    await interaction.reply({ embeds: [embed('No Save Found', 'Use `/hsr begin` first.')], flags: MessageFlags.Ephemeral });
+    await interaction.update({
+      components: [buildErrorContainer('No Save Found', 'Use `/hsr begin` first.', 'hsr_profile')],
+      flags: MessageFlags.IsComponentsV2,
+    });
     return;
   }
   const { slot } = data;
@@ -321,13 +396,13 @@ export async function handleHsrExpressStorageView(interaction: any) {
   const inventory = getInventory(userId, slot);
   const lines = inventory.length > 0
     ? inventory.map((item: any) => `• ${item.name} ×${item.quantity}`).join('\n')
-    : ['No items yet.'];
+    : 'No items yet.';
 
   const container = new ContainerBuilder()
     .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Storage Room'))
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
     .addTextDisplayComponents(new TextDisplayBuilder().setContent('## Items Stored'))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(typeof lines === 'string' ? lines : lines.join('\n')));
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines));
 
   container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
     .addActionRowComponents(
@@ -336,14 +411,17 @@ export async function handleHsrExpressStorageView(interaction: any) {
       ),
     );
 
-  await interaction.reply({ components: [container], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
+  await interaction.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
 }
 
 export async function handleHsrExpressVaultView(interaction: any) {
   const userId = interaction.user.id;
   const data = getSlotData(userId);
   if (!data) {
-    await interaction.reply({ embeds: [embed('No Save Found', 'Use `/hsr begin` first.')], flags: MessageFlags.Ephemeral });
+    await interaction.update({
+      components: [buildErrorContainer('No Save Found', 'Use `/hsr begin` first.', 'hsr_profile')],
+      flags: MessageFlags.IsComponentsV2,
+    });
     return;
   }
   const { slot } = data;
@@ -352,13 +430,13 @@ export async function handleHsrExpressVaultView(interaction: any) {
   const relicItems = inventory.filter((item: any) => item.item_id === 'relic_fragment' || item.item_id === 'adventure_log');
   const lines = relicItems.length > 0
     ? relicItems.map((item: any) => `• ${item.name} ×${item.quantity}`).join('\n')
-    : ['No relics or materials stored yet.'];
+    : 'No relics or materials stored yet.';
 
   const container = new ContainerBuilder()
     .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Relic Vault'))
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
     .addTextDisplayComponents(new TextDisplayBuilder().setContent('## Vault Contents'))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(typeof lines === 'string' ? lines : lines.join('\n')));
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines));
 
   container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
     .addActionRowComponents(
@@ -367,7 +445,7 @@ export async function handleHsrExpressVaultView(interaction: any) {
       ),
     );
 
-  await interaction.reply({ components: [container], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
+  await interaction.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
 }
 
 
@@ -376,7 +454,10 @@ export async function handleHsrExpressUpgrade(interaction: any) {
   const roomId = interaction.customId.replace('hsr_express_upgrade_', '');
   const data = getSlotData(userId);
   if (!data) {
-    await interaction.reply({ embeds: [embed('No Save Found', 'Use `/hsr begin` first.')], flags: MessageFlags.Ephemeral });
+    await interaction.update({
+      components: [buildErrorContainer('No Save Found', 'Use `/hsr begin` first.', 'hsr_profile')],
+      flags: MessageFlags.IsComponentsV2,
+    });
     return;
   }
   const { slot } = data;
@@ -384,14 +465,25 @@ export async function handleHsrExpressUpgrade(interaction: any) {
   const rooms = getPlayerExpress(userId, slot);
   const room = rooms.find((r: any) => r.room_id === roomId);
   if (!room) {
-    await interaction.reply({ embeds: [embed('Room Not Found', 'This room does not exist on your Express.')], flags: MessageFlags.Ephemeral });
+    await interaction.update({
+      components: [buildErrorContainer('Room Not Found', 'This room does not exist on your Express.')],
+      flags: MessageFlags.IsComponentsV2,
+    });
     return;
   }
 
   if (room.level >= room.max_level) {
-    await interaction.reply({
-      embeds: [embed('Max Level', `${room.name} is already at maximum level (Lv.${room.max_level}).`)],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Max Level'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(`${room.name} is already at maximum level (Lv.${room.max_level}).`))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_express').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
@@ -400,20 +492,34 @@ export async function handleHsrExpressUpgrade(interaction: any) {
   const costs = roomRef?.upgrade_costs ? JSON.parse(roomRef.upgrade_costs) : [];
   const nextCost = costs.find((c: any) => c.level === room.level + 1);
   if (!nextCost) {
-    await interaction.reply({ embeds: [embed('Error', 'No upgrade data found for this level.')], flags: MessageFlags.Ephemeral });
+    await interaction.update({
+      components: [buildErrorContainer('Error', 'No upgrade data found for this level.')],
+      flags: MessageFlags.IsComponentsV2,
+    });
     return;
   }
 
   const player = getPlayer(userId, slot);
   if (!player) {
-    await interaction.reply({ embeds: [embed('Error', 'Player data not found.')], flags: MessageFlags.Ephemeral });
+    await interaction.update({
+      components: [buildErrorContainer('Error', 'Player data not found.')],
+      flags: MessageFlags.IsComponentsV2,
+    });
     return;
   }
 
   if (player.credits < nextCost.credits) {
-    await interaction.reply({
-      embeds: [embed('Insufficient Credits', `You need **${nextCost.credits.toLocaleString()}** credits. You have **${player.credits.toLocaleString()}**.`)],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Insufficient Credits'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(`You need **${nextCost.credits.toLocaleString()}** credits. You have **${player.credits.toLocaleString()}**.`))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_express').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
@@ -424,9 +530,17 @@ export async function handleHsrExpressUpgrade(interaction: any) {
       const invItem = inventory.find((i: any) => i.item_id === matId);
       if (!invItem || invItem.quantity < (qty as number)) {
         const matName = matId.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
-        await interaction.reply({
-          embeds: [embed('Missing Materials', `You need **${qty}x ${matName}** to upgrade.`)],
-          flags: MessageFlags.Ephemeral,
+        await interaction.update({
+          components: [new ContainerBuilder()
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Missing Materials'))
+            .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(`You need **${qty}x ${matName}** to upgrade.`))
+            .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+            .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+              new ButtonBuilder().setCustomId('hsr_express').setLabel('Back').setStyle(ButtonStyle.Secondary),
+            ))
+          ],
+          flags: MessageFlags.IsComponentsV2,
         });
         return;
       }
@@ -449,9 +563,9 @@ export async function handleHsrExpressUpgrade(interaction: any) {
         addItem(userId, slot, matId, qty as number);
       }
     }
-    await interaction.reply({
-      embeds: [embed('Upgrade Failed', 'Could not upgrade the room. It may already be at max level.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [buildErrorContainer('Upgrade Failed', 'Could not upgrade the room. It may already be at max level.')],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
@@ -468,8 +582,16 @@ export async function handleHsrExpressUpgrade(interaction: any) {
     successDesc.push('This room has reached its maximum level!');
   }
 
-  await interaction.reply({
-    embeds: [embedColored(COLORS.success, 'Room Upgraded!', successDesc.join('\n'))],
-    flags: MessageFlags.Ephemeral,
+  await interaction.update({
+    components: [new ContainerBuilder()
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Room Upgraded!'))
+      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(successDesc.join('\n')))
+      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+      .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId('hsr_express').setLabel('Back').setStyle(ButtonStyle.Secondary),
+      ))
+    ],
+    flags: MessageFlags.IsComponentsV2,
   });
 }

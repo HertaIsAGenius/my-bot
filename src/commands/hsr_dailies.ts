@@ -43,24 +43,21 @@ function formatRewardLines(totals: Record<string, number>): string[] {
 }
 
 export async function handleHsrDailies(interaction: any) {
+  const isSlash = interaction.isChatInputCommand();
   const userId = interaction.user.id;
 
   const slots = getSaveSlots(userId);
   if (!slots.length) {
-    await interaction.reply({
-      embeds: [embed('No Save Found', 'Use `/hsr begin` to create a Trailblazer.')],
-      flags: MessageFlags.Ephemeral,
-    });
+    const payload = { embeds: [embed('No Save Found', 'Use `/hsr begin` to create a Trailblazer.')], flags: MessageFlags.Ephemeral };
+    if (isSlash) await interaction.reply(payload); else await interaction.update(payload);
     return;
   }
   const slot = slots.sort((a, b) => b.last_played.localeCompare(a.last_played))[0].slot_number;
 
   const player = getPlayer(userId, slot);
   if (!player) {
-    await interaction.reply({
-      embeds: [embed('Corrupted Save', 'Use `/hsr begin` to recreate this slot.')],
-      flags: MessageFlags.Ephemeral,
-    });
+    const payload = { embeds: [embed('Corrupted Save', 'Use `/hsr begin` to recreate this slot.')], flags: MessageFlags.Ephemeral };
+    if (isSlash) await interaction.reply(payload); else await interaction.update(payload);
     return;
   }
 
@@ -107,10 +104,8 @@ export async function handleHsrDailies(interaction: any) {
       ),
     );
 
-  await interaction.reply({
-    components: [container],
-    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
-  });
+  const payload = { components: [container], flags: MessageFlags.IsComponentsV2 };
+  if (isSlash) await interaction.reply(payload); else await interaction.update(payload);
 }
 
 export async function handleHsrClaimDaily(interaction: any) {
@@ -118,9 +113,9 @@ export async function handleHsrClaimDaily(interaction: any) {
 
   const slots = getSaveSlots(userId);
   if (!slots.length) {
-    await interaction.reply({
+    await interaction.update({
       embeds: [embed('No Save Found', 'Use `/hsr begin` to create a Trailblazer.')],
-      flags: MessageFlags.Ephemeral,
+      components: [],
     });
     return;
   }
@@ -138,9 +133,9 @@ export async function handleHsrClaimDaily(interaction: any) {
   });
 
   if (!unclaimed.length) {
-    await interaction.reply({
+    await interaction.update({
       embeds: [embed('Nothing to Claim', 'Complete your daily commissions first!')],
-      flags: MessageFlags.Ephemeral,
+      components: [],
     });
     return;
   }

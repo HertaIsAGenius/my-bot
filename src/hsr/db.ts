@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import * as path from 'path';
+import { readFileSync, existsSync } from 'node:fs';
 
 const DB_PATH = path.resolve(process.cwd(), 'data/hsr.db');
 const db = new Database(DB_PATH);
@@ -338,6 +339,29 @@ function initSchema() {
       is_boss INTEGER NOT NULL DEFAULT 0,
       loot TEXT NOT NULL DEFAULT '{}',
       skills TEXT NOT NULL DEFAULT '[]'
+    );
+
+    -- Reference: Light Cone templates (catalog)
+    CREATE TABLE IF NOT EXISTS hsr_light_cone_templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      path TEXT NOT NULL,
+      rarity INTEGER NOT NULL CHECK(rarity IN (3,4,5)),
+      base_hp INTEGER NOT NULL DEFAULT 100,
+      base_atk INTEGER NOT NULL DEFAULT 50,
+      base_def INTEGER NOT NULL DEFAULT 20,
+      passive_description TEXT NOT NULL DEFAULT '',
+      passive_name TEXT NOT NULL DEFAULT ''
+    );
+
+    -- Reference: Relic set templates (catalog)
+    CREATE TABLE IF NOT EXISTS hsr_relic_set_templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      rarity INTEGER NOT NULL DEFAULT 5 CHECK(rarity BETWEEN 3 AND 5),
+      two_piece_bonus TEXT NOT NULL DEFAULT '',
+      four_piece_bonus TEXT NOT NULL DEFAULT '',
+      lore TEXT NOT NULL DEFAULT ''
     );
 
     -- Discord progression gates
@@ -1356,6 +1380,211 @@ seedEnemies();
 seedResourceNodes();
 seedQuests();
 seedAchievements();
+syncAllFromTxtFiles();
+
+// ── .txt File Sync ──
+
+interface ParsedEntry {
+  id: string;
+  fields: Record<string, string>;
+}
+
+function parseTxtFile(filePath: string): ParsedEntry[] {
+  if (!existsSync(filePath)) return [];
+  const raw = readFileSync(filePath, 'utf-8');
+  const lines = raw.split(/\r?\n/);
+  const entries: ParsedEntry[] = [];
+  let current: ParsedEntry | null = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const blockMatch = trimmed.match(/^\[(.+)\]$/);
+    if (blockMatch) {
+      if (current) entries.push(current);
+      current = { id: blockMatch[1], fields: {} };
+      continue;
+    }
+
+    if (current) {
+      const colonIdx = trimmed.indexOf(':');
+      if (colonIdx > 0) {
+        const key = trimmed.slice(0, colonIdx).trim();
+        const val = trimmed.slice(colonIdx + 1).trim();
+        current.fields[key] = val;
+      }
+    }
+  }
+  if (current) entries.push(current);
+  return entries;
+}
+
+function txtDir(): string {
+  return path.resolve(process.cwd(), 'data', 'hsr');
+}
+
+export function syncCharactersFromTxt(): { added: number; updated: number } {
+  const entries = parseTxtFile(path.join(txtDir(), 'CharacterInfo.txt'));
+  if (entries.length === 0) return { added: 0, updated: 0 };
+
+  let added = 0, updated = 0;
+  const upsert = db.prepare(`INSERT INTO hsr_characters
+    (id, name, path, element, rarity, base_hp, base_atk, base_def, base_speed,
+     taunt_value, is_free, obtain_source, ascension_materials, trace_data,
+     skill_description, ultimate_description, talent_description, technique_description)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      name=excluded.name, path=excluded.path, element=excluded.element,
+      rarity=excluded.rarity, base_hp=excluded.base_hp, base_atk=excluded.base_atk,
+      base_def=excluded.base_def, base_speed=excluded.base_speed,
+      taunt_value=excluded.taunt_value, is_free=excluded.is_free,
+      obtain_source=excluded.obtain_source, ascension_materials=excluded.ascension_materials,
+      trace_data=excluded.trace_data, skill_description=excluded.skill_description,
+      ultimate_description=excluded.ultimate_description,
+      talent_description=excluded.talent_description,
+      technique_description=excluded.technique_description`);
+
+  db.transaction(() => {
+    for (const e of entries) {
+      const f = e.fields;
+      if (!f.name || !f.path || !f.element) continue;
+      const exists = db.prepare('SELECT 1 FROM hsr_characters WHERE id=?').get(e.id);
+      upsert.run(
+        e.id, f.name, f.path, f.element,
+        parseInt(f.rarity) || 5,
+        parseInt(f.base_hp) || 100, parseInt(f.base_atk) || 50,
+        parseInt(f.base_def) || 40, parseInt(f.base_speed) || 100,
+        parseInt(f.taunt_value) || 100,
+        parseInt(f.is_free) || 0,
+        f.obtain_source || 'warp',
+        f.ascension_materials || '[]',
+        f.trace_data || '{}',
+        f.skill_description || '', f.ultimate_description || '',
+        f.talent_description || '', f.technique_description || '',
+      );
+      if (exists) updated++; else added++;
+    }
+  })();
+  return { added, updated };
+}
+
+export function syncLightConesFromTxt(): { added: number; updated: number } {
+  const entries = parseTxtFile(path.join(txtDir(), 'LightConeInfo.txt'));
+  if (entries.length === 0) return { added: 0, updated: 0 };
+
+  let added = 0, updated = 0;
+  const upsert = db.prepare(`INSERT INTO hsr_light_cone_templates
+    (id, name, path, rarity, base_hp, base_atk, base_def, passive_name, passive_description)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      name=excluded.name, path=excluded.path, rarity=excluded.rarity,
+      base_hp=excluded.base_hp, base_atk=excluded.base_atk, base_def=excluded.base_def,
+      passive_name=excluded.passive_name, passive_description=excluded.passive_description`);
+
+  db.transaction(() => {
+    for (const e of entries) {
+      const f = e.fields;
+      if (!f.name || !f.path) continue;
+      const exists = db.prepare('SELECT 1 FROM hsr_light_cone_templates WHERE id=?').get(e.id);
+      upsert.run(
+        e.id, f.name, f.path,
+        parseInt(f.rarity) || 4,
+        parseInt(f.base_hp) || 100, parseInt(f.base_atk) || 50, parseInt(f.base_def) || 20,
+        f.passive_name || '', f.passive_description || '',
+      );
+      if (exists) updated++; else added++;
+    }
+  })();
+  return { added, updated };
+}
+
+export function syncRelicSetsFromTxt(): { added: number; updated: number } {
+  const entries = parseTxtFile(path.join(txtDir(), 'RelicsInfo.txt'));
+  if (entries.length === 0) return { added: 0, updated: 0 };
+
+  let added = 0, updated = 0;
+  const upsert = db.prepare(`INSERT INTO hsr_relic_set_templates
+    (id, name, rarity, two_piece_bonus, four_piece_bonus, lore)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      name=excluded.name, rarity=excluded.rarity,
+      two_piece_bonus=excluded.two_piece_bonus,
+      four_piece_bonus=excluded.four_piece_bonus, lore=excluded.lore`);
+
+  db.transaction(() => {
+    for (const e of entries) {
+      const f = e.fields;
+      if (!f.name) continue;
+      const exists = db.prepare('SELECT 1 FROM hsr_relic_set_templates WHERE id=?').get(e.id);
+      upsert.run(
+        e.id, f.name,
+        parseInt(f.rarity) || 5,
+        f.two_piece_bonus || '', f.four_piece_bonus || '', f.lore || '',
+      );
+      if (exists) updated++; else added++;
+    }
+  })();
+  return { added, updated };
+}
+
+export function syncEnemiesFromTxt(): { added: number; updated: number } {
+  const entries = parseTxtFile(path.join(txtDir(), 'EnemyInfo.txt'));
+  if (entries.length === 0) return { added: 0, updated: 0 };
+
+  let added = 0, updated = 0;
+  const upsert = db.prepare(`INSERT INTO hsr_enemies
+    (id, name, element, weaknesses, resistances, hp, atk, def, speed, toughness,
+     location_id, is_elite, is_boss, loot, skills)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      name=excluded.name, element=excluded.element,
+      weaknesses=excluded.weaknesses, resistances=excluded.resistances,
+      hp=excluded.hp, atk=excluded.atk, def=excluded.def,
+      speed=excluded.speed, toughness=excluded.toughness,
+      location_id=excluded.location_id, is_elite=excluded.is_elite,
+      is_boss=excluded.is_boss, loot=excluded.loot, skills=excluded.skills`);
+
+  db.transaction(() => {
+    for (const e of entries) {
+      const f = e.fields;
+      if (!f.name || !f.element) continue;
+
+      const weaknesses = f.weaknesses ? JSON.stringify(f.weaknesses.split(',').map((s: string) => s.trim())) : '[]';
+      const resistances = f.resistances ? JSON.stringify(f.resistances.split(',').map((s: string) => s.trim())) : '[]';
+      const skills = f.skills ? JSON.stringify(f.skills.split(',').map((s: string) => {
+        const [name, mult] = s.trim().split(':');
+        return { name: name.trim(), multiplier: parseFloat(mult) || 1.0 };
+      })) : '[]';
+      const loot = f.loot ? JSON.stringify({ family: f.loot }) : '{}';
+
+      const exists = db.prepare('SELECT 1 FROM hsr_enemies WHERE id=?').get(e.id);
+      upsert.run(
+        e.id, f.name, f.element,
+        weaknesses, resistances,
+        parseInt(f.hp) || 100, parseInt(f.atk) || 20, parseInt(f.def) || 15,
+        parseInt(f.speed) || 100, parseInt(f.toughness) || 60,
+        f.location_id || null,
+        parseInt(f.is_elite) || 0, parseInt(f.is_boss) || 0,
+        loot, skills,
+      );
+      if (exists) updated++; else added++;
+    }
+  })();
+  return { added, updated };
+}
+
+export function syncAllFromTxtFiles(): void {
+  const chars = syncCharactersFromTxt();
+  const lcs = syncLightConesFromTxt();
+  const relics = syncRelicSetsFromTxt();
+  const enemies = syncEnemiesFromTxt();
+  const total = chars.added + lcs.added + relics.added + enemies.added;
+  const totalUpd = chars.updated + lcs.updated + relics.updated + enemies.updated;
+  if (total > 0 || totalUpd > 0) {
+    console.log(`[HSR Sync] Characters: +${chars.added}/${chars.updated} | Light Cones: +${lcs.added}/${lcs.updated} | Relic Sets: +${relics.added}/${relics.updated} | Enemies: +${enemies.added}/${enemies.updated}`);
+  }
+}
 
 // ── Player query helpers ──
 
@@ -1881,6 +2110,29 @@ export function getWarpHistory(userId: string, slot: number, bannerId: string, l
   return db.prepare('SELECT * FROM hsr_warp_history WHERE user_id = ? AND slot_number = ? AND banner_id = ? ORDER BY timestamp DESC, id DESC LIMIT ?').all(userId, slot, bannerId, limit);
 }
 
+export function getWarpSessions(userId: string, slot: number, bannerId: string, limit: number): any[] {
+  return db.prepare(`
+    SELECT timestamp, COUNT(*) as count,
+      SUM(CASE WHEN rarity = 5 THEN 1 ELSE 0 END) as five_star_count,
+      SUM(CASE WHEN rarity = 4 THEN 1 ELSE 0 END) as four_star_count
+    FROM hsr_warp_history
+    WHERE user_id = ? AND slot_number = ? AND banner_id = ?
+    GROUP BY timestamp
+    ORDER BY timestamp DESC
+    LIMIT ?
+  `).all(userId, slot, bannerId, limit);
+}
+
+export function getWarpSessionItems(userId: string, slot: number, bannerId: string, timestamp: string): any[] {
+  return db.prepare(`
+    SELECT wh.*, c.name as char_name
+    FROM hsr_warp_history wh
+    LEFT JOIN hsr_characters c ON wh.character_id = c.id
+    WHERE wh.user_id = ? AND wh.slot_number = ? AND wh.banner_id = ? AND wh.timestamp = ?
+    ORDER BY wh.rarity DESC, wh.id ASC
+  `).all(userId, slot, bannerId, timestamp);
+}
+
 // ── Team Management ──
 
 export function getPlayerRoster(userId: string, slot: number): any[] {
@@ -1943,6 +2195,10 @@ export function unequipRelic(userId: string, slot: number, relicId: number): boo
 export function addRelic(userId: string, slot: number, data: { set_name: string; piece_type: string; rarity: number; main_stat: string; sub_stats: string }): number {
   const result = db.prepare('INSERT INTO hsr_relics (user_id, slot_number, set_name, piece_type, rarity, level, main_stat, sub_stats) VALUES (?, ?, ?, ?, ?, 0, ?, ?)').run(userId, slot, data.set_name, data.piece_type, data.rarity, data.main_stat, data.sub_stats);
   return Number(result.lastInsertRowid);
+}
+
+export function getCharacterLightCone(userId: string, slot: number, charId: string): any {
+  return db.prepare('SELECT * FROM hsr_light_cones WHERE user_id = ? AND slot_number = ? AND character_id = ?').get(userId, slot, charId);
 }
 
 // ── Re-export the db instance for direct use if needed ──

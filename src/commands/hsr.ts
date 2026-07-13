@@ -166,22 +166,43 @@ export default async function hsrCommand(interaction: ChatInputCommandInteractio
   await interaction.reply({ content: 'Unknown subcommand.', flags: MessageFlags.Ephemeral });
 }
 
-const LOADBAR = '<:LoadBarEmpty1:1523289923799482409><:LoadBarEmpty2:1523290039872917574><:LoadBarEmpty2:1523290039872917574><:LoadBarEmpty2:1523290039872917574><:LoadBarEmpty2:1523290039872917574><:LoadBarEmpty3:1523290155622862889>';
+const BAR_EMPTY_START = '<:LoadBarEmpty1:1523289923799482409>';
+const BAR_FILLED_START = '<:LoadBar1:1523277881164435506>';
+const BAR_EMPTY_MID = '<:LoadBarEmpty2:1523290039872917574>';
+const BAR_FILLED_MID = '<:LoadBar2:1523278877533929593>';
+const BAR_EMPTY_END = '<:LoadBarEmpty3:1523290155622862889>';
+const BAR_ALMOST_END = '<:LoadBar4:1523278813176397944>';
+const BAR_FULL_END = '<:loadbarfull4:1525944079219691581>';
+
+function getLoadBar(current: number, max: number): string {
+  const pct = max > 0 ? (current / max) * 100 : 0;
+  const start = pct > 5 ? BAR_FILLED_START : BAR_EMPTY_START;
+  let filledMids: number;
+  let end: string;
+  if (pct <= 5)       { filledMids = 0; end = BAR_EMPTY_END; }
+  else if (pct <= 19) { filledMids = 0; end = BAR_EMPTY_END; }
+  else if (pct <= 30) { filledMids = 1; end = BAR_EMPTY_END; }
+  else if (pct <= 49) { filledMids = 2; end = BAR_EMPTY_END; }
+  else if (pct <= 65) { filledMids = 3; end = BAR_EMPTY_END; }
+  else if (pct <= 84) { filledMids = 4; end = BAR_ALMOST_END; }
+  else                { filledMids = 4; end = BAR_FULL_END; }
+  return start + BAR_FILLED_MID.repeat(filledMids) + BAR_EMPTY_MID.repeat(4 - filledMids) + end;
+}
 
 export async function handleHsrProfile(interaction: any) {
+  const isSlash = interaction.isChatInputCommand();
   const userId = interaction.user.id;
   const slots = getSaveSlots(userId);
   if (slots.length === 0) {
-    await interaction.reply({
-      embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')],
-      flags: MessageFlags.Ephemeral,
-    });
+    const payload = { embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')], flags: MessageFlags.Ephemeral };
+    if (isSlash) await interaction.reply(payload); else await interaction.update(payload);
     return;
   }
   const slot = slots.sort((a, b) => b.last_played.localeCompare(a.last_played))[0];
   const player = getPlayer(userId, slot.slot_number);
   if (!player) {
-    await interaction.reply({ embeds: [embed('Corrupted Save', 'Use `/hsr begin` and choose **Corrupted** to recreate this slot.')], flags: MessageFlags.Ephemeral });
+    const payload = { embeds: [embed('Corrupted Save', 'Use `/hsr begin` and choose **Corrupted** to recreate this slot.')], flags: MessageFlags.Ephemeral };
+    if (isSlash) await interaction.reply(payload); else await interaction.update(payload);
     return;
   }
   const party = getPlayerCharacters(userId, slot.slot_number).filter((c: any) => c.equipped);
@@ -196,12 +217,14 @@ export async function handleHsrProfile(interaction: any) {
     .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Trailblazer Profile'))
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
     .addTextDisplayComponents(new TextDisplayBuilder().setContent(`${slot.traveler_name} · Lv.${player.trailblaze_level} Trailblazer`))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(LOADBAR))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`${player.trailblaze_xp}/${player.trailblaze_level * 100} | ${Math.round(player.trailblaze_xp / (player.trailblaze_level * 100) * 100)}% XP`))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(getLoadBar(player.trailblaze_xp, player.trailblaze_level * 100)))
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
     .addTextDisplayComponents(new TextDisplayBuilder().setContent('## Character Information'))
     .addTextDisplayComponents(new TextDisplayBuilder().setContent(`\`${slot.pronouns}\` · Path of ${pathLabel}`))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(mc ? `${mc.name} \`(Lv.${mc.level})\`` : ''))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(LOADBAR))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(mc ? `${mc.name} \`(Lv.${mc.level})\`` : 'No character equipped'))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(mc ? `${mc.xp ?? 0}/${(mc.level ?? 1) * 50} | ${Math.round(((mc.xp ?? 0) / ((mc.level ?? 1) * 50)) * 100)}% XP` : ''))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(mc ? getLoadBar(mc.xp ?? 0, (mc.level ?? 1) * 50) : BAR_EMPTY_START + BAR_EMPTY_MID.repeat(4) + BAR_EMPTY_END))
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
     .addTextDisplayComponents(new TextDisplayBuilder().setContent('## Currency Information'))
     .addTextDisplayComponents(new TextDisplayBuilder().setContent(`${player.credits.toLocaleString()} Credits`))
@@ -215,7 +238,8 @@ export async function handleHsrProfile(interaction: any) {
     .addTextDisplayComponents(new TextDisplayBuilder().setContent('## Achievements'))
     .addTextDisplayComponents(new TextDisplayBuilder().setContent(achievementSummary))
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(LOADBAR))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`${player.trailblaze_power}/240 | ${Math.round((player.trailblaze_power / 240) * 100)}%`))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(getLoadBar(player.trailblaze_power, 240)))
     .addTextDisplayComponents(new TextDisplayBuilder().setContent(`\`${player.trailblaze_power}/${player.trailblaze_power_max}\` in Reserve`))
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
     .addActionRowComponents(
@@ -238,10 +262,8 @@ export async function handleHsrProfile(interaction: any) {
         new ButtonBuilder().setCustomId('hsr_warp').setLabel('Warp').setStyle(ButtonStyle.Secondary),
       ),
     );
-  await interaction.reply({
-    components: [container],
-    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
-  });
+  const payload = { components: [container], flags: MessageFlags.IsComponentsV2 };
+  if (isSlash) await interaction.reply(payload); else await interaction.update(payload);
 }
 
 // ── Interaction handlers (registered in index.ts registry) ──
@@ -250,7 +272,7 @@ export async function handleHsrQuestBoard(interaction: any) {
   const userId = interaction.user.id;
   const slots = getSaveSlots(userId);
   if (slots.length === 0) {
-    await interaction.reply({ embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')], flags: MessageFlags.Ephemeral });
+    await interaction.update({ embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')], components: [] });
     return;
   }
   const slot = slots.sort((a, b) => b.last_played.localeCompare(a.last_played))[0].slot_number;
@@ -288,7 +310,7 @@ export async function handleHsrQuestBoard(interaction: any) {
       ),
     );
 
-  await interaction.reply({ components: [container], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
+  await interaction.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
 }
 
 export async function handleHsrSlotPick(interaction: any) {

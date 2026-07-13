@@ -1,7 +1,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize } from 'discord.js';
-import { embed, embedColored } from '../utils/embed';
+import { embed } from '../utils/embed';
 import { db, getSaveSlots, getPlayer, getLocation, getWorld, movePlayer, addColdMeter, addItem, addCredits, getResourceNodesForLocation, getMaterialName, getTodaysDailies, autoAssignDailies, completeDaily, getHertaStationItems, generateEnemyFormations, rollTagRewards, rollOldSearchReward, getParty } from '../hsr/db';
-import { startCombat, buildCombatEmbed, buildActionRows } from './hsr_combat';
+import { startCombat, buildCombatContainer } from './hsr_combat';
 import { incrementDailyObjective } from './hsr_dailies';
 
 const exploreRoomNodes = new Map<string, Array<{ id: string; name: string; tag: string }>>();
@@ -145,24 +145,31 @@ function buildExploreContainer(userId: string, slot: number): { container: Conta
 
   container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
 
-  let moveRow = new ActionRowBuilder<ButtonBuilder>();
-  let count = 0;
-  for (const loc of connectedLocs) {
-    if (count === 5) {
-      container.addActionRowComponents(moveRow);
-      moveRow = new ActionRowBuilder<ButtonBuilder>();
-      count = 0;
-    }
-    moveRow.addComponents(
-      new ButtonBuilder()
-        .setCustomId(`hsr_explore_move_${loc.id}`)
-        .setLabel(`Move to: ${loc.name}`)
-        .setStyle(ButtonStyle.Secondary),
+  if (connectedLocs.length >= 2) {
+    const shuffled = [...connectedLocs].sort(() => Math.random() - 0.5);
+    const left = shuffled[0];
+    const right = shuffled[1];
+    container.addActionRowComponents(
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`hsr_explore_move_${left.id}`)
+          .setLabel('Go Left')
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId(`hsr_explore_move_${right.id}`)
+          .setLabel('Go Right')
+          .setStyle(ButtonStyle.Primary),
+      ),
     );
-    count++;
-  }
-  if (count > 0) {
-    container.addActionRowComponents(moveRow);
+  } else if (connectedLocs.length === 1) {
+    container.addActionRowComponents(
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`hsr_explore_move_${connectedLocs[0].id}`)
+          .setLabel(`Go to ${connectedLocs[0].name}`)
+          .setStyle(ButtonStyle.Primary),
+      ),
+    );
   }
 
   container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
@@ -174,28 +181,18 @@ function buildExploreContainer(userId: string, slot: number): { container: Conta
       .setStyle(ButtonStyle.Secondary),
   );
 
-  if (hasDeliveryHere) {
-    backRow.addComponents(
-      new ButtonBuilder()
-        .setCustomId('hsr_explore_deliver')
-        .setLabel('📦 Deliver')
-        .setStyle(ButtonStyle.Secondary),
-    );
-  }
-
   container.addActionRowComponents(backRow);
 
   return { container };
 }
 
 export async function handleHsrExplore(interaction: any) {
+  const isSlash = interaction.isChatInputCommand();
   const userId = interaction.user.id;
   const slot = getLatestSlot(userId);
   if (!slot) {
-    await interaction.reply({
-      embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')],
-      flags: MessageFlags.Ephemeral,
-    });
+    const payload = { embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')], flags: MessageFlags.Ephemeral };
+    if (isSlash) await interaction.reply(payload); else await interaction.update(payload);
     return;
   }
 
@@ -206,17 +203,13 @@ export async function handleHsrExplore(interaction: any) {
 
   const view = buildExploreContainer(userId, slot);
   if (!view) {
-    await interaction.reply({
-      embeds: [embed('Error', 'Could not load location data.')],
-      flags: MessageFlags.Ephemeral,
-    });
+    const payload = { embeds: [embed('Error', 'Could not load location data.')], flags: MessageFlags.Ephemeral };
+    if (isSlash) await interaction.reply(payload); else await interaction.update(payload);
     return;
   }
 
-  await interaction.reply({
-    components: [view.container],
-    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
-  });
+  const payload = { components: [view.container], flags: MessageFlags.IsComponentsV2 };
+  if (isSlash) await interaction.reply(payload); else await interaction.update(payload);
 }
 
 export async function handleHsrExploreMove(interaction: any) {
@@ -224,18 +217,34 @@ export async function handleHsrExploreMove(interaction: any) {
   const locId = interaction.customId.replace('hsr_explore_move_', '');
   const slot = getLatestSlot(userId);
   if (!slot) {
-    await interaction.reply({
-      embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Save Found'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('Use `/hsr begin` to create your Trailblazer.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
 
   const dest = getLocation(locId);
   if (!dest) {
-    await interaction.reply({
-      embeds: [embed('Error', 'Destination location not found.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Error'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('Destination location not found.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_explore').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
@@ -251,11 +260,10 @@ export async function handleHsrExploreMove(interaction: any) {
 
   initRoomNodes(userId, slot, locId);
 
-  await interaction.deferUpdate();
-
   const view = buildExploreContainer(userId, slot);
-  await interaction.editReply({
+  await interaction.update({
     components: view ? [view.container] : [],
+    flags: MessageFlags.IsComponentsV2,
   });
 }
 
@@ -263,36 +271,68 @@ export async function handleHsrExploreSearch(interaction: any) {
   const userId = interaction.user.id;
   const slot = getLatestSlot(userId);
   if (!slot) {
-    await interaction.reply({
-      embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Save Found'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('Use `/hsr begin` to create your Trailblazer.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
 
   const player = getPlayer(userId, slot);
   if (!player) {
-    await interaction.reply({
-      embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Save Found'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('Use `/hsr begin` to create your Trailblazer.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
 
   const party = getParty(userId, slot);
   if (!party || party.length === 0) {
-    await interaction.reply({
-      embeds: [embed('No Party', 'You have no characters in your party.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Party'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('You have no characters in your party.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_explore').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
 
   const formations = generateEnemyFormations(player.current_location);
   if (formations.length === 0 || Math.random() >= 0.667) {
-    await interaction.reply({
-      embeds: [embedColored(0x3b1f6e, '🔍 Search Results', 'You search the area but find no enemies...')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# 🔍 Search Results'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('You search the area but find no enemies...'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_explore').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
@@ -306,19 +346,26 @@ export async function handleHsrExploreSearch(interaction: any) {
     .filter(Boolean);
 
   if (enemyData.length === 0) {
-    await interaction.reply({
-      embeds: [embedColored(0x3b1f6e, '🔍 Search Results', 'You search the area but find no enemies...')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# 🔍 Search Results'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('You search the area but find no enemies...'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_explore').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
 
   const state = startCombat(interaction, userId, slot, enemyData);
 
-  await interaction.reply({
-    embeds: [buildCombatEmbed(state)],
-    components: buildActionRows(state),
-    flags: MessageFlags.Ephemeral,
+  await interaction.update({
+    components: [buildCombatContainer(state)],
+    flags: MessageFlags.IsComponentsV2,
   });
 }
 
@@ -326,27 +373,51 @@ export async function handleHsrExploreAvailableResources(interaction: any) {
   const userId = interaction.user.id;
   const slot = getLatestSlot(userId);
   if (!slot) {
-    await interaction.reply({
-      embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Save Found'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('Use `/hsr begin` to create your Trailblazer.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
 
   const player = getPlayer(userId, slot);
   if (!player) {
-    await interaction.reply({
-      embeds: [embed('Error', 'Could not load player data.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Error'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('Could not load player data.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_explore').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
 
   const nodes = getRemainingNodes(userId, slot, player.current_location);
   if (nodes.length === 0) {
-    await interaction.reply({
-      embeds: [embed('No Resources', 'All resources in this area have been collected.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Resources'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('All resources in this area have been collected.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_explore').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
@@ -363,15 +434,15 @@ export async function handleHsrExploreAvailableResources(interaction: any) {
     .addActionRowComponents(
       new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
-          .setCustomId('hsr_profile')
+          .setCustomId('hsr_explore')
           .setLabel('Back')
           .setStyle(ButtonStyle.Secondary),
       ),
     );
 
-  await interaction.reply({
+  await interaction.update({
     components: [container],
-    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+    flags: MessageFlags.IsComponentsV2,
   });
 }
 
@@ -379,19 +450,52 @@ export async function handleHsrExploreGather(interaction: any) {
   const userId = interaction.user.id;
   const slot = getLatestSlot(userId);
   if (!slot) {
-    await interaction.reply({ embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')], flags: MessageFlags.Ephemeral });
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Save Found'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('Use `/hsr begin` to create your Trailblazer.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
+    });
     return;
   }
 
   const player = getPlayer(userId, slot);
   if (!player) {
-    await interaction.reply({ embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')], flags: MessageFlags.Ephemeral });
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Save Found'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('Use `/hsr begin` to create your Trailblazer.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
+    });
     return;
   }
 
   const node = removeRandomNode(userId, slot, player.current_location);
   if (!node) {
-    await interaction.reply({ embeds: [embed('No Resources', 'All resources in this area have been collected.')], flags: MessageFlags.Ephemeral });
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Resources'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('All resources in this area have been collected.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_explore').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
+    });
     return;
   }
 
@@ -439,15 +543,15 @@ export async function handleHsrExploreGather(interaction: any) {
     .addActionRowComponents(
       new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
-          .setCustomId('hsr_profile')
+          .setCustomId('hsr_explore')
           .setLabel('Back')
           .setStyle(ButtonStyle.Secondary),
       ),
     );
 
-  await interaction.reply({
+  await interaction.update({
     components: [container],
-    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+    flags: MessageFlags.IsComponentsV2,
   });
 }
 
@@ -455,14 +559,36 @@ export async function handleHsrExploreDeliver(interaction: any) {
   const userId = interaction.user.id;
   const slot = getLatestSlot(userId);
   if (!slot) {
-    await interaction.reply({ embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')], flags: MessageFlags.Ephemeral });
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Save Found'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('Use `/hsr begin` to create your Trailblazer.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
+    });
     return;
   }
 
   const todaysDailies = getTodaysDailies(userId, slot);
   const deliveryDaily = todaysDailies.find((d: any) => d.commission_type === 'deliver' && d.completed === 0);
   if (!deliveryDaily) {
-    await interaction.reply({ embeds: [embed('No Delivery', 'You have no pending delivery commissions.')], flags: MessageFlags.Ephemeral });
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Delivery'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('You have no pending delivery commissions.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_explore').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
+    });
     return;
   }
 
@@ -478,15 +604,15 @@ export async function handleHsrExploreDeliver(interaction: any) {
     .addActionRowComponents(
       new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
-          .setCustomId('hsr_profile')
+          .setCustomId('hsr_explore')
           .setLabel('Back')
           .setStyle(ButtonStyle.Secondary),
       ),
     );
 
-  await interaction.reply({
+  await interaction.update({
     components: [container],
-    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+    flags: MessageFlags.IsComponentsV2,
   });
 }
 
@@ -494,23 +620,40 @@ export async function handleHsrBackToExplore(interaction: any) {
   const userId = interaction.user.id;
   const slot = getLatestSlot(userId);
   if (!slot) {
-    await interaction.reply({
-      embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Save Found'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('Use `/hsr begin` to create your Trailblazer.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
 
   const view = buildExploreContainer(userId, slot);
   if (!view) {
-    await interaction.reply({
-      embeds: [embed('Error', 'Could not load explore view.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Error'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('Could not load explore view.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
 
   await interaction.update({
     components: [view.container],
+    flags: MessageFlags.IsComponentsV2,
   });
 }

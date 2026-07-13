@@ -1,6 +1,5 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
-import { embed, embedColored } from '../utils/embed';
-import { getSaveSlots, getPlayer, getParty, getEnemiesByLocation, addCredits, addTrailblazeXp, addItem, getMaterialName, getEnemyMaterialFamily, rollMaterialDrop, rollCreditDrop } from '../hsr/db';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize } from 'discord.js';
+import { getSaveSlots, getPlayer, getParty, getEnemiesByLocation, addCredits, addTrailblazeXp, addItem, getMaterialName, getEnemyMaterialFamily, rollMaterialDrop, rollCreditDrop, addRelic } from '../hsr/db';
 
 interface CombatState {
   userId: string;
@@ -123,8 +122,11 @@ function buildEnergyBar(current: number, max: number, length: number = 8): strin
   return '▰'.repeat(filled) + '▱'.repeat(length - filled);
 }
 
-export function buildCombatEmbed(state: CombatState): object {
-  const lines: string[] = [];
+export function buildCombatContainer(state: CombatState): ContainerBuilder {
+  const container = new ContainerBuilder();
+
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent('# ⚔️ Combat'));
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
 
   const turnOrderLines: string[] = [];
   for (let i = 0; i < state.turnOrder.length; i++) {
@@ -136,71 +138,65 @@ export function buildCombatEmbed(state: CombatState): object {
     const suffix = i === state.turnIndex ? '**' : '';
     turnOrderLines.push(`${prefix}${i + 1}. ${name}${suffix}`);
   }
-  lines.push('**Turn Order**');
-  lines.push(turnOrderLines.join('\n'));
-  lines.push('');
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Turn Order**\n${turnOrderLines.join('\n')}`));
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
 
   if (state.log.length > 0) {
     const recentLog = state.log.slice(-6);
-    lines.push('**Combat Log**');
-    for (const entry of recentLog) {
-      lines.push(`> ${entry}`);
-    }
-    lines.push('');
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Combat Log**\n${recentLog.map(e => `> ${e}`).join('\n')}`));
+    container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
   }
 
-  lines.push('**Party**');
+  const partyLines: string[] = ['**Party**'];
   for (const c of state.characters) {
     if (!c.alive) {
-      lines.push(`💀 ~~${c.name}~~`);
+      partyLines.push(`💀 ~~${c.name}~~`);
       continue;
     }
     const hpBar = buildHpBar(c.hp, c.maxHp);
     const energyBar = buildEnergyBar(c.energy, c.maxEnergy);
-    lines.push(`❤️ **${c.name}** \`${c.hp}/${c.maxHp}\``);
-    lines.push(`   ${hpBar}  ⚡${energyBar} \`${c.energy}/${c.maxEnergy}\``);
+    partyLines.push(`❤️ **${c.name}** \`${c.hp}/${c.maxHp}\``);
+    partyLines.push(`   ${hpBar}  ⚡${energyBar} \`${c.energy}/${c.maxEnergy}\``);
   }
-  lines.push('');
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(partyLines.join('\n')));
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
 
-  lines.push('**Enemies**');
+  const enemyLines: string[] = ['**Enemies**'];
   for (const e of state.enemies) {
     if (!e.alive) {
-      lines.push(`💀 ~~${e.name}~~`);
+      enemyLines.push(`💀 ~~${e.name}~~`);
       continue;
     }
     const hpBar = buildHpBar(e.hp, e.maxHp);
     const toughnessBar = buildHpBar(e.toughness, e.maxToughness, 8);
     const brokenLabel = e.broken ? ' [BROKEN]' : '';
-    lines.push(`**${e.name}${brokenLabel}** \`${e.hp}/${e.maxHp}\``);
-    lines.push(`   ${hpBar}`);
-    lines.push(`   ◆ Toughness: ${toughnessBar} \`${e.toughness}/${e.maxToughness}\``);
+    enemyLines.push(`**${e.name}${brokenLabel}** \`${e.hp}/${e.maxHp}\``);
+    enemyLines.push(`   ${hpBar}`);
+    enemyLines.push(`   ◆ Toughness: ${toughnessBar} \`${e.toughness}/${e.maxToughness}\``);
   }
-  lines.push('');
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(enemyLines.join('\n')));
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
 
   const spFilled = '◆'.repeat(state.skillPoints);
   const spEmpty = '◇'.repeat(5 - state.skillPoints);
-  lines.push(`**Skill Points:** ${spFilled}${spEmpty}`);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Skill Points:** ${spFilled}${spEmpty}`));
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
 
-  return embedColored(0x3b1f6e, '⚔️ Combat', lines.join('\n'));
+  addCombatButtons(container, state);
+
+  return container;
 }
 
-export function buildActionRows(state: CombatState): ActionRowBuilder<ButtonBuilder>[] {
-  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-
+function addCombatButtons(container: ContainerBuilder, state: CombatState): void {
   const entity = state.turnOrder[state.turnIndex];
   if (!entity || entity.type === 'enemy') {
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId('hsr_combat_enemy_turn')
-        .setLabel('Enemy Turn')
-        .setStyle(ButtonStyle.Danger),
-      new ButtonBuilder()
-        .setCustomId('hsr_combat_run')
-        .setLabel('Run')
-        .setStyle(ButtonStyle.Secondary),
+    container.addActionRowComponents(
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId('hsr_combat_enemy_turn').setLabel('Enemy Turn').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId('hsr_combat_run').setLabel('Run').setStyle(ButtonStyle.Secondary),
+      )
     );
-    rows.push(row);
-    return rows;
+    return;
   }
 
   const charIndex = entity.index;
@@ -208,37 +204,27 @@ export function buildActionRows(state: CombatState): ActionRowBuilder<ButtonBuil
   const canSkill = state.skillPoints >= 1;
   const canUlt = c.energy >= c.maxEnergy;
 
-  const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`hsr_combat_action_${charIndex}_basic`)
-      .setLabel('Basic ATK')
-      .setEmoji('⚔️')
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId(`hsr_combat_action_${charIndex}_skill`)
-      .setLabel('Skill')
-      .setEmoji('💠')
-      .setStyle(ButtonStyle.Success)
-      .setDisabled(!canSkill),
-    new ButtonBuilder()
-      .setCustomId(`hsr_combat_action_${charIndex}_ultimate`)
-      .setLabel('Ultimate')
-      .setEmoji('💥')
-      .setStyle(ButtonStyle.Danger)
-      .setDisabled(!canUlt),
-    new ButtonBuilder()
-      .setCustomId('hsr_combat_run')
-      .setLabel('Run')
-      .setEmoji('🏃')
-      .setStyle(ButtonStyle.Secondary),
+  container.addActionRowComponents(
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId(`hsr_combat_action_${charIndex}_basic`).setLabel('Basic ATK').setEmoji('⚔️').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`hsr_combat_action_${charIndex}_skill`).setLabel('Skill').setEmoji('💠').setStyle(ButtonStyle.Success).setDisabled(!canSkill),
+      new ButtonBuilder().setCustomId(`hsr_combat_action_${charIndex}_ultimate`).setLabel('Ultimate').setEmoji('💥').setStyle(ButtonStyle.Danger).setDisabled(!canUlt),
+      new ButtonBuilder().setCustomId('hsr_combat_run').setLabel('Run').setEmoji('🏃').setStyle(ButtonStyle.Secondary),
+    )
   );
-  rows.push(actionRow);
-
-  return rows;
 }
 
-function buildResultEmbed(title: string, description: string, color: number = 0x3b1f6e): object {
-  return embedColored(color, title, description);
+function buildResultContainer(title: string, description: string): ContainerBuilder {
+  return new ContainerBuilder()
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# ${title}`))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(description))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+    .addActionRowComponents(
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId('hsr_explore').setLabel('Back to Explore').setStyle(ButtonStyle.Secondary),
+      ),
+    );
 }
 
 function buildVictoryRewards(userId: string, slot: number, enemies: CombatEnemy[]): string {
@@ -269,6 +255,32 @@ function buildVictoryRewards(userId: string, slot: number, enemies: CombatEnemy[
   return lines.join('\n');
 }
 
+const RELIC_SETS = [
+  'Passing', 'Champion', 'Bandit', 'Scholar', 'Knight', 'Thief',
+  'Hunter', 'Guardian', 'Pioneer', 'Valiant',
+];
+
+const RELIC_PIECES = ['head', 'hands', 'body', 'feet', 'planar_sphere', 'link_rope'] as const;
+
+const RELIC_MAIN_STATS: Record<string, string[]> = {
+  head: ['HP'],
+  hands: ['ATK'],
+  body: ['HP%', 'DEF%', 'ATK%', 'CRIT Rate', 'CRIT DMG', 'Outgoing Healing'],
+  feet: ['HP%', 'DEF%', 'ATK%', 'SPD'],
+  planar_sphere: ['HP%', 'DEF%', 'ATK%', 'Physical DMG', 'Fire DMG', 'Ice DMG', 'Lightning DMG', 'Wind DMG', 'Quantum DMG', 'Imaginary DMG'],
+  link_rope: ['HP%', 'DEF%', 'ATK%', 'Break Effect', 'Energy Regen Rate', 'Outgoing Healing'],
+};
+
+function rollRelicDrop(): { set_name: string; piece_type: string; rarity: number; main_stat: string; sub_stats: string } | null {
+  const set = RELIC_SETS[Math.floor(Math.random() * RELIC_SETS.length)];
+  const piece = RELIC_PIECES[Math.floor(Math.random() * RELIC_PIECES.length)];
+  const roll = Math.random();
+  const rarity = roll < 0.05 ? 5 : roll < 0.25 ? 4 : 3;
+  const stats = RELIC_MAIN_STATS[piece];
+  const mainStat = stats[Math.floor(Math.random() * stats.length)];
+  return { set_name: set, piece_type: piece, rarity, main_stat: mainStat, sub_stats: '[]' };
+}
+
 function applyLoot(userId: string, slot: number, enemies: CombatEnemy[]): string[] {
   const lootLines: string[] = [];
   for (const e of enemies) {
@@ -283,6 +295,15 @@ function applyLoot(userId: string, slot: number, enemies: CombatEnemy[]): string
     const credits = rollCreditDrop();
     addCredits(userId, slot, credits);
     lootLines.push(`+ **${credits}** Credits`);
+
+    if (Math.random() < 0.2) {
+      const relic = rollRelicDrop();
+      if (relic) {
+        addRelic(userId, slot, relic);
+        const stars = relic.rarity === 5 ? '★★★★★' : relic.rarity === 4 ? '★★★★' : '★★★';
+        lootLines.push(`+ ${stars} **${relic.set_name}** ${relic.piece_type.replace(/_/g, ' ')}`);
+      }
+    }
   }
   return lootLines;
 }
@@ -300,9 +321,8 @@ function totalCreditsForEnemies(enemies: CombatEnemy[]): number {
 }
 
 async function showCombatView(interaction: any, state: CombatState): Promise<void> {
-  const embed = buildCombatEmbed(state);
-  const rows = buildActionRows(state);
-  await interaction.update({ embeds: [embed], components: rows });
+  const container = buildCombatContainer(state);
+  await interaction.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
 }
 
 async function showVictory(interaction: any, state: CombatState): Promise<void> {
@@ -328,10 +348,8 @@ async function showVictory(interaction: any, state: CombatState): Promise<void> 
     resultLines.push(...lootLines);
   }
 
-  await interaction.update({
-    embeds: [buildResultEmbed('🎉 Victory!', resultLines.join('\n'), 0x3A7D44)],
-    components: [],
-  });
+  const container = buildResultContainer('🎉 Victory!', resultLines.join('\n'));
+  await interaction.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
 }
 
 async function showDefeat(interaction: any, state: CombatState): Promise<void> {
@@ -341,10 +359,8 @@ async function showDefeat(interaction: any, state: CombatState): Promise<void> {
 
   const lines = ['All party members have fallen.', 'Your party automatically recovers — no penalties.'];
 
-  await interaction.update({
-    embeds: [buildResultEmbed('💀 Defeat', lines.join('\n'), 0x9B2226)],
-    components: [],
-  });
+  const container = buildResultContainer('💀 Defeat', lines.join('\n'));
+  await interaction.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
 }
 
 async function showEscape(interaction: any, state: CombatState): Promise<void> {
@@ -352,10 +368,8 @@ async function showEscape(interaction: any, state: CombatState): Promise<void> {
   const slot = state.slot;
   combatStates.delete(`${userId}:${slot}`);
 
-  await interaction.update({
-    embeds: [buildResultEmbed('🏃 Escaped', 'You successfully fled from battle!', 0xCA6702)],
-    components: [],
-  });
+  const container = buildResultContainer('🏃 Escaped', 'You successfully fled from battle!');
+  await interaction.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
 }
 
 export function startCombat(interaction: any, userId: string, slot: number, pickedEnemies: any[]): CombatState {
@@ -420,45 +434,85 @@ export async function handleHsrCombat(interaction: any) {
   const userId = interaction.user.id;
   const slot = getLatestSlot(userId);
   if (!slot) {
-    await interaction.reply({
-      embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Save Found'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('Use `/hsr begin` to create your Trailblazer.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
 
   const key = `${userId}:${slot}`;
   if (combatStates.has(key)) {
-    await interaction.reply({
-      embeds: [embed('Combat Active', 'You are already in combat! Finish or run first.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Combat Active'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('You are already in combat! Finish or run first.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
 
   const player = getPlayer(userId, slot);
   if (!player) {
-    await interaction.reply({
-      embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Save Found'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('Use `/hsr begin` to create your Trailblazer.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
 
   const party = getParty(userId, slot);
   if (!party || party.length === 0) {
-    await interaction.reply({
-      embeds: [embed('No Party', 'You have no characters in your party. Summon or equip some first.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Party'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('You have no characters in your party. Summon or equip some first.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
 
   const enemies = getEnemiesByLocation(player.current_location);
   if (!enemies || enemies.length === 0) {
-    await interaction.reply({
-      embeds: [embed('Safe Zone', 'No enemies in this area. Explore another location.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Safe Zone'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('No enemies in this area. Explore another location.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
@@ -471,21 +525,24 @@ export async function handleHsrCombat(interaction: any) {
   }
 
   const state = startCombat(interaction, userId, slot, pickedEnemies);
-
-  await interaction.reply({
-    embeds: [buildCombatEmbed(state)],
-    components: buildActionRows(state),
-    flags: MessageFlags.Ephemeral,
-  });
+  await showCombatView(interaction, state);
 }
 
 export async function handleHsrCombatAction(interaction: any) {
   const userId = interaction.user.id;
   const slot = getLatestSlot(userId);
   if (!slot) {
-    await interaction.reply({
-      embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Save Found'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('Use `/hsr begin` to create your Trailblazer.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
@@ -493,9 +550,17 @@ export async function handleHsrCombatAction(interaction: any) {
   const key = `${userId}:${slot}`;
   const state = combatStates.get(key);
   if (!state || !state.active) {
-    await interaction.reply({
-      embeds: [embed('No Combat', 'No active combat session. Start one with the combat button.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Combat'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('No active combat session. Start one with the combat button.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
@@ -506,10 +571,7 @@ export async function handleHsrCombatAction(interaction: any) {
 
   const char = state.characters[charIndex];
   if (!char || !char.alive) {
-    await interaction.reply({
-      embeds: [embed('Invalid', 'That character is not available.')],
-      flags: MessageFlags.Ephemeral,
-    });
+    await showCombatView(interaction, state);
     return;
   }
 
@@ -542,17 +604,11 @@ export async function handleHsrCombatAction(interaction: any) {
   }
 
   if (action === 'skill' && state.skillPoints < 1) {
-    await interaction.reply({
-      embeds: [embed('No SP', 'Not enough Skill Points. Use Basic ATK or wait.')],
-      flags: MessageFlags.Ephemeral,
-    });
+    await showCombatView(interaction, state);
     return;
   }
   if (action === 'ultimate' && char.energy < char.maxEnergy) {
-    await interaction.reply({
-      embeds: [embed('No Energy', 'Energy is not full.')],
-      flags: MessageFlags.Ephemeral,
-    });
+    await showCombatView(interaction, state);
     return;
   }
 
@@ -617,9 +673,17 @@ export async function handleHsrCombatEnemyTurn(interaction: any) {
   const userId = interaction.user.id;
   const slot = getLatestSlot(userId);
   if (!slot) {
-    await interaction.reply({
-      embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Save Found'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('Use `/hsr begin` to create your Trailblazer.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
@@ -627,9 +691,17 @@ export async function handleHsrCombatEnemyTurn(interaction: any) {
   const key = `${userId}:${slot}`;
   const state = combatStates.get(key);
   if (!state || !state.active) {
-    await interaction.reply({
-      embeds: [embed('No Combat', 'No active combat session.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Combat'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('No active combat session.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
@@ -679,24 +751,86 @@ export async function handleHsrCombatEnemyTurn(interaction: any) {
 
   advanceTurn(state);
 
-  const color = 0x9B2226;
-  const resultEmbed = embedColored(color, '⚡ Enemy Turn', resultLines.join('\n'));
-  const combatView = buildCombatEmbed(state);
-  const rows = buildActionRows(state);
+  const container = new ContainerBuilder()
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent('# ⚡ Enemy Turn'))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(resultLines.join('\n')))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
 
-  await interaction.update({
-    embeds: [resultEmbed, combatView],
-    components: rows,
-  });
+  const turnOrderLines: string[] = [];
+  for (let i = 0; i < state.turnOrder.length; i++) {
+    const ent = state.turnOrder[i];
+    const name = ent.type === 'ally'
+      ? state.characters[ent.index].name
+      : state.enemies[ent.index]?.name ?? 'Unknown';
+    const prefix = i === state.turnIndex ? '⬅️ **' : '';
+    const suffix = i === state.turnIndex ? '**' : '';
+    turnOrderLines.push(`${prefix}${i + 1}. ${name}${suffix}`);
+  }
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Turn Order**\n${turnOrderLines.join('\n')}`));
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+
+  if (state.log.length > 0) {
+    const recentLog = state.log.slice(-6);
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Combat Log**\n${recentLog.map(e => `> ${e}`).join('\n')}`));
+    container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+  }
+
+  const partyLines: string[] = ['**Party**'];
+  for (const c of state.characters) {
+    if (!c.alive) {
+      partyLines.push(`💀 ~~${c.name}~~`);
+      continue;
+    }
+    const hpBar = buildHpBar(c.hp, c.maxHp);
+    const energyBar = buildEnergyBar(c.energy, c.maxEnergy);
+    partyLines.push(`❤️ **${c.name}** \`${c.hp}/${c.maxHp}\``);
+    partyLines.push(`   ${hpBar}  ⚡${energyBar} \`${c.energy}/${c.maxEnergy}\``);
+  }
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(partyLines.join('\n')));
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+
+  const enemyLines: string[] = ['**Enemies**'];
+  for (const e of state.enemies) {
+    if (!e.alive) {
+      enemyLines.push(`💀 ~~${e.name}~~`);
+      continue;
+    }
+    const hpBar = buildHpBar(e.hp, e.maxHp);
+    const toughnessBar = buildHpBar(e.toughness, e.maxToughness, 8);
+    const brokenLabel = e.broken ? ' [BROKEN]' : '';
+    enemyLines.push(`**${e.name}${brokenLabel}** \`${e.hp}/${e.maxHp}\``);
+    enemyLines.push(`   ${hpBar}`);
+    enemyLines.push(`   ◆ Toughness: ${toughnessBar} \`${e.toughness}/${e.maxToughness}\``);
+  }
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(enemyLines.join('\n')));
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+
+  const spFilled = '◆'.repeat(state.skillPoints);
+  const spEmpty = '◇'.repeat(5 - state.skillPoints);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Skill Points:** ${spFilled}${spEmpty}`));
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+
+  addCombatButtons(container, state);
+
+  await interaction.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
 }
 
 export async function handleHsrCombatRun(interaction: any) {
   const userId = interaction.user.id;
   const slot = getLatestSlot(userId);
   if (!slot) {
-    await interaction.reply({
-      embeds: [embed('No Save Found', 'Use `/hsr begin` to create your Trailblazer.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Save Found'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('Use `/hsr begin` to create your Trailblazer.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
@@ -704,9 +838,17 @@ export async function handleHsrCombatRun(interaction: any) {
   const key = `${userId}:${slot}`;
   const state = combatStates.get(key);
   if (!state || !state.active) {
-    await interaction.reply({
-      embeds: [embed('No Combat', 'No active combat session.')],
-      flags: MessageFlags.Ephemeral,
+    await interaction.update({
+      components: [new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# No Combat'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('No active combat session.'))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('hsr_profile').setLabel('Back').setStyle(ButtonStyle.Secondary),
+        ))
+      ],
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
@@ -717,7 +859,6 @@ export async function handleHsrCombatRun(interaction: any) {
   }
 
   const aliveEnemies = state.enemies.filter(e => e.alive);
-  const aliveAllies = state.characters.filter(c => c.alive);
   const failLines: string[] = ['Failed to escape!'];
 
   for (const enemy of aliveEnemies) {
@@ -743,12 +884,67 @@ export async function handleHsrCombatRun(interaction: any) {
     return;
   }
 
-  const failEmbed = embedColored(0xCA6702, '🏃 Failed to Escape', failLines.join('\n'));
-  const combatView = buildCombatEmbed(state);
-  const rows = buildActionRows(state);
+  const container = new ContainerBuilder()
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent('# 🏃 Failed to Escape'))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(failLines.join('\n')))
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
 
-  await interaction.update({
-    embeds: [failEmbed, combatView],
-    components: rows,
-  });
+  const turnOrderLines: string[] = [];
+  for (let i = 0; i < state.turnOrder.length; i++) {
+    const ent = state.turnOrder[i];
+    const name = ent.type === 'ally'
+      ? state.characters[ent.index].name
+      : state.enemies[ent.index]?.name ?? 'Unknown';
+    const prefix = i === state.turnIndex ? '⬅️ **' : '';
+    const suffix = i === state.turnIndex ? '**' : '';
+    turnOrderLines.push(`${prefix}${i + 1}. ${name}${suffix}`);
+  }
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Turn Order**\n${turnOrderLines.join('\n')}`));
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+
+  if (state.log.length > 0) {
+    const recentLog = state.log.slice(-6);
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Combat Log**\n${recentLog.map(e => `> ${e}`).join('\n')}`));
+    container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+  }
+
+  const partyLines: string[] = ['**Party**'];
+  for (const c of state.characters) {
+    if (!c.alive) {
+      partyLines.push(`💀 ~~${c.name}~~`);
+      continue;
+    }
+    const hpBar = buildHpBar(c.hp, c.maxHp);
+    const energyBar = buildEnergyBar(c.energy, c.maxEnergy);
+    partyLines.push(`❤️ **${c.name}** \`${c.hp}/${c.maxHp}\``);
+    partyLines.push(`   ${hpBar}  ⚡${energyBar} \`${c.energy}/${c.maxEnergy}\``);
+  }
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(partyLines.join('\n')));
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+
+  const enemyLines: string[] = ['**Enemies**'];
+  for (const e of state.enemies) {
+    if (!e.alive) {
+      enemyLines.push(`💀 ~~${e.name}~~`);
+      continue;
+    }
+    const hpBar = buildHpBar(e.hp, e.maxHp);
+    const toughnessBar = buildHpBar(e.toughness, e.maxToughness, 8);
+    const brokenLabel = e.broken ? ' [BROKEN]' : '';
+    enemyLines.push(`**${e.name}${brokenLabel}** \`${e.hp}/${e.maxHp}\``);
+    enemyLines.push(`   ${hpBar}`);
+    enemyLines.push(`   ◆ Toughness: ${toughnessBar} \`${e.toughness}/${e.maxToughness}\``);
+  }
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(enemyLines.join('\n')));
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+
+  const spFilled = '◆'.repeat(state.skillPoints);
+  const spEmpty = '◇'.repeat(5 - state.skillPoints);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Skill Points:** ${spFilled}${spEmpty}`));
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+
+  addCombatButtons(container, state);
+
+  await interaction.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
 }
